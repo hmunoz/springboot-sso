@@ -1,0 +1,21 @@
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0.2
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      DB_VENDOR: h2
+      #KEYCLOAK_IMPORT: /tmp/keycloak/realm-export.json
+    ports:
+      - 9090:8080
+    volumes:
+      - ./realm-export.json:/opt/keycloak/data/import/realm-export.json
+    command: start-dev --import-realm
+  postgres:
+    image: postgres:16.3
+    environment:
+      - POSTGRES_DB=video
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=P4ssword!
+    ports:
+      - 5433:5432
