@@ -20,7 +20,7 @@
   ],
 
   // Use 'postCreateCommand' to run commands after the container is created.
-  "postCreateCommand": "docker compose -f compose.yaml up -d",
+  //"postCreateCommand": "docker compose -f compose.yaml up -d",
 
   // Configure tool-specific properties.
   // Configure tool-specific properties.
