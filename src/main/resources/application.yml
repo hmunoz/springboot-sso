@@ -1,4 +1,13 @@
 spring:
+  #Seguridad
+  security:
+    oauth2:
+      resource-server:
+        jwt:
+          client-id: test-api
+          issuer-uri: http://video-keycloak:8080/realms/videoclub
+          jwk-set-uri: http://video-keycloak:8080/realms/videoclub/protocol/openid-connect/certs
+  #Base de datos
   datasource:
     url: ${JDBC_DATABASE_URL:jdbc:postgresql://localhost:5432/video}
     username: ${JDBC_DATABASE_USERNAME:postgres}
@@ -29,5 +38,6 @@ error:
       5xx: ERROR
     codes:
       TestNameUnique: TEST_NAME_UNIQUE
+# swagger
 springdoc:
   pathsToMatch: /, /api/**

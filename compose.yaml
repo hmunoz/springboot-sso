@@ -1,16 +1,22 @@
 services:
   keycloak:
     image: quay.io/keycloak/keycloak:25.0.2
+    container_name: video-keycloak
+    hostname: video-keycloak
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
       DB_VENDOR: h2
-      #KEYCLOAK_IMPORT: /tmp/keycloak/realm-export.json
     ports:
       - 9090:8080
     volumes:
       - ./realm-export.json:/opt/keycloak/data/import/realm-export.json
     command: start-dev --import-realm
+    healthcheck:
+      test: [ "CMD", "curl", "--head","fsS", "http://localhost:8080/health/ready" ]
+      interval: 5s
+      timeout: 2s
+      retries: 15
   postgres:
     image: postgres:16.3
     environment:
@@ -19,3 +25,8 @@ services:
       - POSTGRES_PASSWORD=P4ssword!
     ports:
       - 5433:5432
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
