@@ -37,9 +37,19 @@ error:
       5xx: ERROR
     codes:
       TestNameUnique: TEST_NAME_UNIQUE
-# swagger
+# swagger y keycloak integration
 springdoc:
-  pathsToMatch: /, /api/**
+  oauth2:
+    authorization-url: http://localhost:9090/realms/videoclub/protocol/openid-connect/auth
+  api-docs:
+    enabled: true
+    path: "/api-docs"
+  swagger-ui:
+    path: "/swagger-ui.html"
+    url: "/api-docs"
+    oauth:
+      client-id: web
+      realm: videoclub
 
 # Enable Actuator endpoints in application.yml
 management:
