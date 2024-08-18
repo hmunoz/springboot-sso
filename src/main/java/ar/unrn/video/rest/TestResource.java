@@ -2,12 +2,17 @@ package ar.unrn.video.rest;
 
 import ar.unrn.video.model.TestDTO;
 import ar.unrn.video.service.TestService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import java.util.List;
+
+import org.springframework.context.annotation.Role;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,6 +34,8 @@ public class TestResource {
     }
 
     @GetMapping
+    @Operation(summary = "get all Test", security = @SecurityRequirement(name = "bearerAuth"))
+    @PreAuthorize("hasRole('admin')")
     public ResponseEntity<List<TestDTO>> getAllTests() {
         return ResponseEntity.ok(testService.findAll());
     }
