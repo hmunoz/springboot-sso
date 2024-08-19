@@ -500,15 +500,16 @@
   "users": [
     {
       "id": "ce51c71a-319e-483c-cc64-cbf11899efb1",
-      "username": "hmunoz",
+      "username": "usuarioadmin",
+      "email": "usuarioadmin@gmail.com",
       "enabled": true,
       "emailVerified": true,
-      "firstName": "Horacio",
-      "lastName": "Munoz",
+      "firstName": "Roberto",
+      "lastName": "Perez",
       "credentials": [
         {
           "type": "password",
-          "value": "hmunoz",
+          "value": "usuarioadmin",
           "temporary": false
         }
       ],
@@ -518,6 +519,29 @@
       "notBefore": 0,
       "groups": [
         "admin"
+      ]
+    },
+    {
+      "id": "de51c71a-319e-483c-dd64-dbf11899efb1",
+      "username": "usuariocliente",
+      "email": "usuariocliente@gmail.com",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Jose",
+      "lastName": "Lopez",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "usuariocliente",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-videoclub"
+      ],
+      "notBefore": 0,
+      "groups": [
+        "client"
       ]
     },
     {
@@ -859,7 +883,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "**********",
+      "secret": "78BoOMc7ZM2zbHHE3bU5JNnHInuErQVn",
       "redirectUris": [
         "https://oauthdebugger.com/debug"
       ],

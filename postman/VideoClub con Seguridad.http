@@ -1,19 +1,18 @@
 # VideoClub con Seguridad
 
 ###
-# @name keycloak get token (web)
+# @name keycloak get token (web angular react)
 POST http://{{host}}:9090/realms/videoclub/protocol/openid-connect/token
 Content-Type: application/x-www-form-urlencoded
 
 client_id = web &
-username = hmunoz &
-password = hmunoz &
+username = usuarioadmin &
+password = usuarioadmin &
 grant_type = password
 
 > {%
     client.test("Request executed successfully", function () {
         client.assert(response.status === 200, "Response status is not 200");
-        client.log("access_token: " + response.body.access_token);
         client.global.set("access_token", response.body.access_token);
     });
 %}
@@ -23,16 +22,14 @@ grant_type = password
 POST http://{{host}}:9090/realms/videoclub/protocol/openid-connect/token
 Content-Type: application/x-www-form-urlencoded
 
-client_id = web &
-username = hmunoz &
-password = hmunoz &
+client_id = test-api &
 client_secret = 78BoOMc7ZM2zbHHE3bU5JNnHInuErQVn &
-grant_type = password
+grant_type = client_credentials
 
 > {%
     client.test("Request executed successfully", function () {
         client.assert(response.status === 200, "Response status is not 200");
-        client.global.set("access_token", response.body.access_token);
+        client.global.set("access_token_api", response.body.access_token);
     });
 %}
 
@@ -50,6 +47,17 @@ Authorization: Bearer {{access_token}}
 ###
 # @name actuator health
 GET http://{{host}}:8080/metrics/health
+
+> {%
+    client.test("Request executed successfully", function () {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+
+###
+# @name api docs
+GET http://{{host}}:8080/api-docs
 
 > {%
     client.test("Request executed successfully", function () {
