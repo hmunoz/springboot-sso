@@ -9,6 +9,7 @@ services:
       DB_VENDOR: h2
     ports:
       - 9090:8080
+    # json export tiene realm videoclub, client test-api y web, usuario, grupos y roles
     volumes:
       - ./realm-export.json:/opt/keycloak/data/import/realm-export.json
     command: start-dev --import-realm
@@ -19,6 +20,8 @@ services:
       retries: 15
   postgres:
     image: postgres:16.3
+    container_name: video-postgres
+    hostname: video-postgres
     environment:
       - POSTGRES_DB=video
       - POSTGRES_USER=postgres
