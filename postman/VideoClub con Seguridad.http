@@ -1,0 +1,59 @@
+# VideoClub con Seguridad
+
+###
+# @name keycloak get token (web)
+POST http://{{host}}:9090/realms/videoclub/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+client_id = web &
+username = hmunoz &
+password = hmunoz &
+grant_type = password
+
+> {%
+    client.test("Request executed successfully", function () {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.log("access_token: " + response.body.access_token);
+        client.global.set("access_token", response.body.access_token);
+    });
+%}
+
+###
+# @name keycloak get token (api)
+POST http://{{host}}:9090/realms/videoclub/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+client_id = web &
+username = hmunoz &
+password = hmunoz &
+client_secret = 78BoOMc7ZM2zbHHE3bU5JNnHInuErQVn &
+grant_type = password
+
+> {%
+    client.test("Request executed successfully", function () {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.global.set("access_token", response.body.access_token);
+    });
+%}
+
+###
+# @name api List get (with login and admin Role)
+GET http://{{host}}:8080/api/tests
+Authorization: Bearer {{access_token}}
+
+> {%
+    client.test("Request executed successfully", function () {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+# @name actuator health
+GET http://{{host}}:8080/metrics/health
+
+> {%
+    client.test("Request executed successfully", function () {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+

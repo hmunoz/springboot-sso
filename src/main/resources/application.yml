@@ -51,9 +51,29 @@ springdoc:
       client-id: web
       realm: videoclub
 
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    whitelabel:
+      enabled: false
+  servlet:
+    context-path: /
+  forward-headers-strategy: framework
+
 # Enable Actuator endpoints in application.yml
 management:
+  security:
+    enabled: false
   endpoints:
+    enabled-by-default: false
     web:
+      base-path: /metrics
       exposure:
-        include: "*"
+        include: "health,info,prometheus"
+  endpoint:
+    info:
+      enabled: true
+    health:
+      enabled: true
+    prometheus:
+      enabled: true
