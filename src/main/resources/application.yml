@@ -27,7 +27,9 @@ spring:
           new_generator_mappings: true
   docker:
     compose:
+      file: ./docker/services.yaml
       lifecycle-management: start-only
+
 error:
   handling:
     http-status-in-json-response: true

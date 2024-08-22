@@ -1,0 +1,10 @@
+name: videoclud
+services:
+  pulsar:
+    image: apachepulsar/pulsar:3.2.3
+    ports:
+      - 9080:8080
+      - 6650:6650
+    environment:
+      PULSAR_MEM: ' -Xms512m -Xmx512m -XX:MaxDirectMemorySize=1g'
+    command: bin/pulsar standalone

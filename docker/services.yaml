@@ -1,0 +1,14 @@
+name: videoclud
+services:
+  postgresql:
+    extends:
+      file: ./postgresql.yaml
+      service: postgresql
+  keycloak:
+    extends:
+      file: ./keycloak.yaml
+      service: keycloak
+  pulsar:
+    extends:
+      file: ./pulsar.yaml
+      service: pulsar
