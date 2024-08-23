@@ -1,0 +1,10 @@
+${AnsiColor.RED}████████╗${AnsiColor.YELLOW}██╗  ██╗${AnsiColor.GREEN} █████╗ ${AnsiColor.CYAN}██╗     ██╗     ███████╗${AnsiColor.BLUE}██████╗
+${AnsiColor.RED}╚══██╔══╝${AnsiColor.YELLOW}██║  ██║${AnsiColor.GREEN}██╔══██╗${AnsiColor.CYAN}██║     ██║     ██╔════╝${AnsiColor.BLUE}██╔══██╗
+${AnsiColor.RED}   ██║   ${AnsiColor.YELLOW}███████║${AnsiColor.GREEN}███████║${AnsiColor.CYAN}██║     ██║     █████╗  ${AnsiColor.BLUE}██████╔╝
+${AnsiColor.RED}   ██║   ${AnsiColor.YELLOW}██╔══██║${AnsiColor.GREEN}██╔══██║${AnsiColor.CYAN}██║     ██║     ██╔══╝  ${AnsiColor.BLUE}██╔══██╗
+${AnsiColor.RED}   ██║   ${AnsiColor.YELLOW}██║  ██║${AnsiColor.GREEN}██║  ██║${AnsiColor.CYAN}███████╗███████╗███████╗${AnsiColor.BLUE}██║  ██║
+${AnsiColor.RED}   ╚═╝   ${AnsiColor.YELLOW}╚═╝  ╚═╝${AnsiColor.GREEN}╚═╝  ╚═╝${AnsiColor.CYAN}╚══════╝╚══════╝╚══════╝${AnsiColor.BLUE}╚═╝  ╚═╝
+
+${AnsiColor.BRIGHT_MAGENTA}:: Taller de Software 2024 - ¡Prepárate para codear y disfrutar! ::${AnsiColor.DEFAULT}
+
+
