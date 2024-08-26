@@ -12,3 +12,7 @@ services:
     extends:
       file: ./pulsar.yaml
       service: pulsar
+  mailhog:
+    extends:
+      file: ./email.yaml
+      service: mailhog

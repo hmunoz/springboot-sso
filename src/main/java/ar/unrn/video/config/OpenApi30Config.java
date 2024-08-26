@@ -5,6 +5,7 @@ import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.media.*;
 import io.swagger.v3.oas.models.responses.ApiResponse;
+import io.swagger.v3.oas.models.security.Scopes;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -36,7 +37,10 @@ public class OpenApi30Config {
                         .type(io.swagger.v3.oas.models.security.SecurityScheme.Type.OAUTH2)
                         .flows(new io.swagger.v3.oas.models.security.OAuthFlows()
                                 .implicit(new io.swagger.v3.oas.models.security.OAuthFlow()
-                                        .authorizationUrl(authorizationUrl)))));
+                                        .authorizationUrl(authorizationUrl)
+                                        .scopes(new Scopes()
+                                                .addString("openid", "OpenID Connect scope")
+                                                .addString("videocloud", "Access to VideoCloud services"))))));
     }
 
     @Bean

@@ -8,3 +8,17 @@ services:
     environment:
       PULSAR_MEM: ' -Xms512m -Xmx512m -XX:MaxDirectMemorySize=1g'
     command: bin/pulsar standalone
+  # https://pulsar.apache.org/docs/3.3.x/administration-pulsar-manager/
+  dashboard:
+    image: apachepulsar/pulsar-manager:latest
+    ports:
+      - "9527:9527"
+      - "7750:7750"
+    container_name: dashboard
+    depends_on:
+      - pulsar
+    links:
+      - pulsar
+    environment:
+      SPRING_CONFIGURATION_FILE: /pulsar-manager/pulsar-manager/application.properties
+      PULSAR_SERVICE_URL: pulsar://pulsar:6650

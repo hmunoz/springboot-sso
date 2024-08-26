@@ -13,18 +13,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 
 @RestController
 @RequestMapping(value = "/api/tests", produces = MediaType.APPLICATION_JSON_VALUE)
+@CrossOrigin(origins = "http://localhost:5173")
 public class TestResource {
 
     private final TestService testService;
@@ -48,7 +42,7 @@ public class TestResource {
     @PostMapping
     @ApiResponse(responseCode = "201")
     @Operation(summary = "create  Test", security = @SecurityRequirement(name = "bearerAuth"))
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<Long> createTest(@RequestBody @Valid final TestDTO testDTO) {
         final Long createdId = testService.create(testDTO);
         return new ResponseEntity<>(createdId, HttpStatus.CREATED);
@@ -64,7 +58,7 @@ public class TestResource {
 
     @DeleteMapping("/{id}")
     @ApiResponse(responseCode = "204")
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @Operation(summary = "delete by id", security = @SecurityRequirement(name = "bearerAuth"))
     public ResponseEntity<Void> deleteTest(@PathVariable(name = "id") final Long id) {
         testService.delete(id);

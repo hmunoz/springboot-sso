@@ -8,7 +8,7 @@ Content-Type: application/x-www-form-urlencoded
 client_id = web &
 username = usuarioadmin &
 password = usuarioadmin &
-grant_type = password
+grant_type = password 
 
 > {%
     client.test("Request executed successfully", function () {
