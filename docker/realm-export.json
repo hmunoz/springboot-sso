@@ -47,15 +47,6 @@
   "roles": {
     "realm": [
       {
-        "id": "bb12a165-992c-4e3e-a901-f1b8c9aaea1c",
-        "name": "cliente",
-        "description": "Cliente VideoClub",
-        "composite": false,
-        "clientRole": false,
-        "containerId": "4bcc68c6-f2d8-435b-bcab-fe55b4c30d80",
-        "attributes": {}
-      },
-      {
         "id": "a5d614fe-3075-4afd-91ea-591c3af166ac",
         "name": "default-roles-videoclub",
         "description": "${role_default-roles}",
@@ -77,6 +68,15 @@
         "attributes": {}
       },
       {
+        "id": "78c9e511-2981-47c4-8b2a-c3e84cb59803",
+        "name": "ROLE_CLIENT",
+        "description": "",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "4bcc68c6-f2d8-435b-bcab-fe55b4c30d80",
+        "attributes": {}
+      },
+      {
         "id": "108d4e69-436f-431d-acf0-6a362aa484c5",
         "name": "offline_access",
         "description": "${role_offline-access}",
@@ -86,9 +86,9 @@
         "attributes": {}
       },
       {
-        "id": "568fac19-13de-4148-b755-f0b5e52dd30b",
-        "name": "admin",
-        "description": "Administrador",
+        "id": "116afe99-5524-4c0f-8741-5fac41cfcd34",
+        "name": "ROLE_ADMIN",
+        "description": "",
         "composite": false,
         "clientRole": false,
         "containerId": "4bcc68c6-f2d8-435b-bcab-fe55b4c30d80",
@@ -426,23 +426,23 @@
   "groups": [
     {
       "id": "0721e221-3f76-4cd5-9d14-775ab8bb70e2",
-      "name": "admin",
-      "path": "/admin",
+      "name": "administrador",
+      "path": "/administrador",
       "subGroups": [],
       "attributes": {},
       "realmRoles": [
-        "admin"
+        "ROLE_ADMIN"
       ],
       "clientRoles": {}
     },
     {
       "id": "b867bbdb-ea8e-40ec-8652-8550411ec36e",
-      "name": "client",
-      "path": "/client",
+      "name": "cliente",
+      "path": "/cliente",
       "subGroups": [],
       "attributes": {},
       "realmRoles": [
-        "cliente"
+        "ROLE_CLIENT"
       ],
       "clientRoles": {}
     }
@@ -518,7 +518,7 @@
       ],
       "notBefore": 0,
       "groups": [
-        "admin"
+        "administrador"
       ]
     },
     {
@@ -541,7 +541,7 @@
       ],
       "notBefore": 0,
       "groups": [
-        "client"
+        "cliente"
       ]
     },
     {
@@ -562,6 +562,13 @@
     }
   ],
   "scopeMappings": [
+    {
+      "clientScope": "videoclub",
+      "roles": [
+        "ROLE_CLIENT",
+        "ROLE_ADMIN"
+      ]
+    },
     {
       "clientScope": "offline_access",
       "roles": [
@@ -883,11 +890,13 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "78BoOMc7ZM2zbHHE3bU5JNnHInuErQVn",
+      "secret": "**********",
       "redirectUris": [
+        "http://localhost:8080/swagger-ui/*",
         "https://oauthdebugger.com/debug"
       ],
       "webOrigins": [
+        "http://localhost:8080/swagger-ui/",
         "https://oauthdebugger.com"
       ],
       "notBefore": 0,
@@ -975,6 +984,7 @@
         "acr",
         "roles",
         "profile",
+        "videoclub",
         "basic",
         "email"
       ],
@@ -998,10 +1008,16 @@
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
-        "http://localhost:8080/swagger-ui/*"
+        "http://localhost:8080/swagger-ui/*",
+        "https://oauthdebugger.com/*",
+        "http://localhost:3000/*",
+        "http://localhost:5173/*",
+        "https://editor.swagger.io/*"
       ],
       "webOrigins": [
-        "/*"
+        "/*",
+        "http://localhost:3000",
+        "http://localhost:5173"
       ],
       "notBefore": 0,
       "bearerOnly": false,
@@ -1016,7 +1032,7 @@
       "attributes": {
         "client.introspection.response.allow.jwt.claim.enabled": "false",
         "login_theme": "keycloak",
-        "post.logout.redirect.uris": "http://localhost:8080/swagger-ui/*",
+        "post.logout.redirect.uris": "http://localhost:8080/swagger-ui/*##http://localhost:5173/*",
         "oauth2.device.authorization.grant.enabled": "false",
         "backchannel.logout.revoke.offline.tokens": "false",
         "use.refresh.tokens": "true",
@@ -1045,6 +1061,7 @@
         "address",
         "phone",
         "offline_access",
+        "videoclub",
         "microprofile-jwt"
       ]
     }
@@ -1193,6 +1210,111 @@
           "config": {
             "introspection.token.claim": "true",
             "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "id": "1c71acd7-8aaa-4abe-8fe0-a1a5510a4ac8",
+      "name": "videoclub",
+      "description": "videoclub",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "gui.order": "",
+        "consent.screen.text": ""
+      },
+      "protocolMappers": [
+        {
+          "id": "7b6f6e32-2ac5-409b-bf0c-d2ef17d6237c",
+          "name": "email",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "introspection.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "user.attribute": "email",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "email",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "id": "c772cc25-a445-4ae4-9d8e-26b4baa62135",
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "foo",
+            "introspection.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "multivalued": "true"
+          }
+        },
+        {
+          "id": "c2533825-af0d-4dca-a31e-87fd478d8f21",
+          "name": "client roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "foo",
+            "introspection.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "resource_access.${client_id}.roles",
+            "jsonType.label": "String",
+            "multivalued": "true"
+          }
+        },
+        {
+          "id": "2d2e9963-1812-4654-ae9f-18970e86c110",
+          "name": "full name",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-full-name-mapper",
+          "consentRequired": false,
+          "config": {
+            "id.token.claim": "true",
+            "introspection.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "id": "d0a600d1-680a-447f-a50d-0a9e23c1b5c0",
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "introspection.token.claim": "true",
+            "multivalued": "true",
+            "user.attribute": "foo",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "groups",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "id": "70e0e3c0-4b81-495b-a7ae-652bfda3b802",
+          "name": "username",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "introspection.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "user.attribute": "username",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "preferred_username",
+            "jsonType.label": "String"
           }
         }
       ]
@@ -1653,7 +1775,18 @@
     "xXSSProtection": "1; mode=block",
     "strictTransportSecurity": "max-age=31536000; includeSubDomains"
   },
-  "smtpServer": {},
+  "smtpServer": {
+    "replyToDisplayName": "taller",
+    "starttls": "false",
+    "auth": "",
+    "port": "1025",
+    "replyTo": "test@taller.com",
+    "host": "mailhog",
+    "from": "test@taller.com",
+    "fromDisplayName": "taller",
+    "envelopeFrom": "test@taller.com",
+    "ssl": "false"
+  },
   "eventsEnabled": false,
   "eventsListeners": [
     "jboss-logging"
@@ -1685,13 +1818,13 @@
         "subComponents": {},
         "config": {
           "allowed-protocol-mapper-types": [
-            "oidc-full-name-mapper",
-            "oidc-usermodel-attribute-mapper",
             "saml-role-list-mapper",
             "saml-user-attribute-mapper",
-            "saml-user-property-mapper",
+            "oidc-usermodel-attribute-mapper",
             "oidc-usermodel-property-mapper",
+            "oidc-full-name-mapper",
             "oidc-sha256-pairwise-sub-mapper",
+            "saml-user-property-mapper",
             "oidc-address-mapper"
           ]
         }
@@ -1716,14 +1849,14 @@
         "subComponents": {},
         "config": {
           "allowed-protocol-mapper-types": [
+            "oidc-address-mapper",
             "oidc-usermodel-attribute-mapper",
-            "oidc-usermodel-property-mapper",
             "saml-user-attribute-mapper",
+            "oidc-usermodel-property-mapper",
             "saml-user-property-mapper",
-            "saml-role-list-mapper",
             "oidc-full-name-mapper",
-            "oidc-sha256-pairwise-sub-mapper",
-            "oidc-address-mapper"
+            "saml-role-list-mapper",
+            "oidc-sha256-pairwise-sub-mapper"
           ]
         }
       },
