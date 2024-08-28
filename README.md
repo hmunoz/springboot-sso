@@ -71,6 +71,12 @@ curl --location 'http://localhost:8080/api/tests' --header 'Authorization: Beare
 ## Testing
 - `spring-boot-starter-test`: Proporciona dependencias comunes para testing en Spring Boot.
 
+
+## TODO
+
+### proyecto keycloakify para personalizar el login con react
+https://medium.com/@abdurrahmanekr/change-your-keycloak-login-interface-using-with-keycloakify-032b00539ccb
+
 ### Documentation
 - https://ravthiru.medium.com/springboot-oauth2-with-keycloak-for-bearer-client-3a31f608a78
 - https://www.baeldung.com/spring-boot-keycloak
