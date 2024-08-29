@@ -1,4 +1,4 @@
-name: videoclud
+name: videoclub
 services:
   pulsar:
     image: apachepulsar/pulsar:3.2.3
@@ -10,7 +10,7 @@ services:
     command: bin/pulsar standalone
   # https://pulsar.apache.org/docs/3.3.x/administration-pulsar-manager/
   dashboard:
-    image: apachepulsar/pulsar-manager:latest
+    image: apachepulsar/pulsar-manager:0.4.0
     ports:
       - "9527:9527"
       - "7750:7750"

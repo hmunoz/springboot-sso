@@ -35,7 +35,18 @@ grant_type = client_credentials
 
 ###
 # @name api List get (with login and admin Role)
-GET http://{{host}}:8080/api/tests
+GET http://{{host}}:8080/tests
+Authorization: Bearer {{access_token}}
+
+> {%
+    client.test("Request executed successfully", function () {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+# @name api List get (with login and admin Role)
+GET http://{{host}}:9500/api/tests
 Authorization: Bearer {{access_token}}
 
 > {%

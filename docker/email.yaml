@@ -1,4 +1,4 @@
-name: videoclud
+name: videoclub
 services:
   mailhog:
     image: mailhog/mailhog

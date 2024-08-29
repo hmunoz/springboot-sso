@@ -1,4 +1,4 @@
-name: videoclud
+name: videoclub
 services:
   postgresql:
     extends:
@@ -16,3 +16,7 @@ services:
     extends:
       file: ./email.yaml
       service: mailhog
+  gateway:
+    extends:
+      file: ./apigateway.yaml
+      service: gateway

@@ -1,4 +1,4 @@
-name: videoclud
+name: videoclub
 services:
   postgresql:
     image: postgres:16.3
