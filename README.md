@@ -77,6 +77,9 @@ curl --location 'http://localhost:8080/api/tests' --header 'Authorization: Beare
 ### proyecto keycloakify para personalizar el login con react
 https://medium.com/@abdurrahmanekr/change-your-keycloak-login-interface-using-with-keycloakify-032b00539ccb
 
+### spring-boot-with-hibernate-2nd-level-cache-on-redis
+https://medium.com/@shahto/scaling-spring-boot-with-hibernate-2nd-level-cache-on-redis-54d588fc8b06
+
 ### Documentation
 - https://ravthiru.medium.com/springboot-oauth2-with-keycloak-for-bearer-client-3a31f608a78
 - https://www.baeldung.com/spring-boot-keycloak

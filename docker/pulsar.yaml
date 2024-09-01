@@ -9,8 +9,9 @@ services:
       PULSAR_MEM: ' -Xms512m -Xmx512m -XX:MaxDirectMemorySize=1g'
     command: bin/pulsar standalone
   # https://pulsar.apache.org/docs/3.3.x/administration-pulsar-manager/
+  # http://pulsar:8080
   dashboard:
-    image: apachepulsar/pulsar-manager:0.4.0
+    image: apachepulsar/pulsar-manager
     ports:
       - "9527:9527"
       - "7750:7750"
