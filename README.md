@@ -72,6 +72,32 @@ curl --location 'http://localhost:8080/api/tests' --header 'Authorization: Beare
 - `spring-boot-starter-test`: Proporciona dependencias comunes para testing en Spring Boot.
 
 
+
+# Acceso y Servicios en MicroK8s
+
+## configurar config m8s
+
+## Mailhog (smtp)
+
+[Mailhog (Web UI)](https://k8s-lia.unrn.edu.ar/mailhog/)
+
+- mailhog.email.svc.cluster.local
+- smtp port 1025
+
+## Keycloak  (SSO)
+
+[Keycloak (Admin)](https://k8s-lia.unrn.edu.ar/keyclaok/)
+
+- realms: videoclub01 al 05
+
+## Postgres (RDS)
+
+[Postgres (Pgadmin)](https://k8s-lia.unrn.edu.ar/pgadmin/browser/)
+
+## minio (bucket S3)
+[Minio API - necesita acceses key y secret por grupo](https://k8s-lia.unrn.edu.ar)
+[Ejemplo imagen](https://k8s-lia.unrn.edu.ar/grupo03/unrnlogo.jpg)
+
 ## TODO
 
 ### proyecto keycloakify para personalizar el login con react
