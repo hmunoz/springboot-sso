@@ -11,11 +11,18 @@ services:
       KC_FEATURES: scripts
       KC_HEALTH_ENABLED: true
       KC_HTTP_MANAGEMENT_PORT: 9990
+      # rabbit
+      KK_TO_RMQ_URL: rabbit
+      KK_TO_RMQ_VHOST: ${RABBITMQ_DEFAULT_VHOST}
+      KK_TO_RMQ_EXCHANGE: ${KK_TO_RMQ_EXCHANGE}
+      KK_TO_RMQ_USERNAME: ${RABBITMQ_DEFAULT_USER}
+      KK_TO_RMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS}
     ports:
       - 9090:8080
     # json export tiene realm videoclub, client test-api y web, usuario, grupos y roles
     volumes:
-      - ./realm-export.json:/opt/keycloak/data/import/realm-export.json
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+      - ./keycloak/keycloak-to-rabbit-3.0.5.jar:/opt/keycloak/providers/keycloak-to-rabbit-3.0.5.jar
     command: start-dev --import-realm
     healthcheck:
       test: [ "CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9990;echo -e 'GET /health/ready HTTP/1.1\r\nhost: http://localhost\r\nConnection: close\r\n\r\n' >&3;if [ $? -eq 0 ]; then echo 'Healthcheck Successful';exit 0;else echo 'Healthcheck Failed';exit 1;fi;" ]

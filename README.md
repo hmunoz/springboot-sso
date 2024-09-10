@@ -109,6 +109,19 @@ https://medium.com/@shahto/scaling-spring-boot-with-hibernate-2nd-level-cache-on
 ### keycloak-event-listener-rabbitmq
 https://github.com/aznamier/keycloak-event-listener-rabbitmq
 https://github.com/bitnami/charts/issues/7865
+https://blog.elest.io/publish-keycloak-events-to-rabbitmq/
+
+The routing key is calculated as follows:
+
+admin events: KK.EVENT.ADMIN.<REALM>.<RESULT>.<RESOURCE_TYPE>.<OPERATION>
+client events: KK.EVENT.CLIENT.<REALM>.<RESULT>.<CLIENT>.<EVENT_TYPE>
+And because the recommended exchange is a TOPIC (amq.topic),
+therefore its easy for Rabbit client to subscribe to selective combinations eg:
+
+all events: KK.EVENT.#
+all events from my realm: KK.EVENT.*.MYREALM.#
+all error events from my realm: KK.EVENT.*.MYREALM.ERROR.#
+all user events from my-relam and my-client: KK.EVENT.*.MY-REALM.*.MY-CLIENT.USER
 
 ### Documentation
 - https://ravthiru.medium.com/springboot-oauth2-with-keycloak-for-bearer-client-3a31f608a78

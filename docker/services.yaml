@@ -8,10 +8,10 @@ services:
     extends:
       file: ./keycloak.yaml
       service: keycloak
-  pulsar:
+  rabbit:
     extends:
-      file: ./pulsar.yaml
-      service: pulsar
+      file: ./rabbit.yaml
+      service: rabbit
   mailhog:
     extends:
       file: ./email.yaml

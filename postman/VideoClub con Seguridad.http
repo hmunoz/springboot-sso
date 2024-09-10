@@ -23,7 +23,7 @@ POST http://{{host}}:9090/realms/videoclub/protocol/openid-connect/token
 Content-Type: application/x-www-form-urlencoded
 
 client_id = test-api &
-client_secret = SMLUeYON1OTov3sugYs9DxDavwGwsWox &
+client_secret = la0ibHyKdfUm4QHX7Em7iD73neLWjKk3 &
 grant_type = client_credentials
 
 > {%
