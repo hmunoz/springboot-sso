@@ -106,9 +106,94 @@ https://medium.com/@abdurrahmanekr/change-your-keycloak-login-interface-using-wi
 ### spring-boot-with-hibernate-2nd-level-cache-on-redis
 https://medium.com/@shahto/scaling-spring-boot-with-hibernate-2nd-level-cache-on-redis-54d588fc8b06
 
+### keycloak-event-listener-rabbitmq
+https://github.com/aznamier/keycloak-event-listener-rabbitmq
+https://github.com/bitnami/charts/issues/7865
+
 ### Documentation
 - https://ravthiru.medium.com/springboot-oauth2-with-keycloak-for-bearer-client-3a31f608a78
 - https://www.baeldung.com/spring-boot-keycloak
 - https://medium.com/@bcarunmail/securing-rest-api-using-keycloak-and-spring-oauth2-6ddf3a1efcc2
 - https://www.baeldung.com/postman-keycloak-endpoints#1-openid-configuration-endpoint
 
+
+# modelo c4  
+## https://structurizr.com/dsl
+- fomato mermaid
+
+```mermaid
+graph LR
+    linkStyle default fill:#ffffff
+
+    subgraph diagram ["Sistema de Compras - Containers"]
+        style diagram fill:#ffffff,stroke:#ffffff
+
+        1["<div style='font-weight: bold'>Usuario</div><div style='font-size: 70%; margin-top: 0px'>[Person]</div>"]
+        style 1 fill:#116611,stroke:#0b470b,color:#ffffff
+
+        subgraph 2 [Sistema de Compras]
+            style 2 fill:#ffffff,stroke:#1f5f1f,color:#1f5f1f
+
+            subgraph group1 [Bases de Datos]
+                style group1 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+                26[("<div style='font-weight: bold'>Base de Datos Catálogo</div><div style='font-size: 70%; margin-top: 0px'>[Container]</div>")]
+                style 26 fill:#8b0000,stroke:#610000,color:#ffffff
+                28[("<div style='font-weight: bold'>Base de Datos Compras</div><div style='font-size: 70%; margin-top: 0px'>[Container]</div>")]
+                style 28 fill:#8b0000,stroke:#610000,color:#ffffff
+                30[("<div style='font-weight: bold'>Base de Datos Notificaciones</div><div style='font-size: 70%; margin-top: 0px'>[Container]</div>")]
+                style 30 fill:#8b0000,stroke:#610000,color:#ffffff
+            end
+
+            subgraph group2 [Frontend y SSO]
+                style group2 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+                3("<div style='font-weight: bold'>Frontend (SPA)</div><div style='font-size: 70%; margin-top: 0px'>[Container]</div>")
+                style 3 fill:#55aa55,stroke:#3b763b,color:#ffffff
+                6("<div style='font-weight: bold'>SSO - Keycloak</div><div style='font-size: 70%; margin-top: 0px'>[Container]</div>")
+                style 6 fill:#ffd700,stroke:#b29600,color:#ffffff
+                8["<div style='font-weight: bold'>API Gateway</div><div style='font-size: 70%; margin-top: 0px'>[Container]</div>"]
+                style 8 fill:#ff6347,stroke:#b24531,color:#ffffff
+            end
+
+            subgraph group3 [Infraestructura]
+                style group3 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+                20["<div style='font-weight: bold'>Servicio SMTP Email</div><div style='font-size: 70%; margin-top: 0px'>[Container]</div>"]
+                style 20 fill:#00ced1,stroke:#009092,color:#ffffff
+                22[("<div style='font-weight: bold'>Bus de Mensajes - RabbitMQ</div><div style='font-size: 70%; margin-top: 0px'>[Container]</div>")]
+                style 22 fill:#ff4500,stroke:#b23000,color:#ffffff
+            end
+
+            subgraph group4 [Microservicios]
+                style group4 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+                11["<div style='font-weight: bold'>Microservicio Catálogo</div><div style='font-size: 70%; margin-top: 0px'>[Container]</div>"]
+                style 11 fill:#8a2be2,stroke:#601e9e,color:#ffffff
+                14["<div style='font-weight: bold'>Microservicio Compras</div><div style='font-size: 70%; margin-top: 0px'>[Container]</div>"]
+                style 14 fill:#8a2be2,stroke:#601e9e,color:#ffffff
+                17["<div style='font-weight: bold'>Microservicio Notificaciones</div><div style='font-size: 70%; margin-top: 0px'>[Container]</div>"]
+                style 17 fill:#8a2be2,stroke:#601e9e,color:#ffffff
+            end
+
+        end
+
+        6-. "<div>Autenticación</div><div style='font-size: 70%'></div>" .->8
+        8-. "<div>Consulta catálogos</div><div style='font-size: 70%'></div>" .->11
+        11-. "<div>Valida JWT</div><div style='font-size: 70%'></div>" .->6
+        8-. "<div>Realiza compras</div><div style='font-size: 70%'></div>" .->14
+        14-. "<div>Valida JWT</div><div style='font-size: 70%'></div>" .->6
+        8-. "<div>Envía notificaciones</div><div style='font-size: 70%'></div>" .->17
+        17-. "<div>Valida JWT</div><div style='font-size: 70%'></div>" .->6
+        17-. "<div>Envía correos</div><div style='font-size: 70%'></div>" .->20
+        11-. "<div>Envía mensajes</div><div style='font-size: 70%'></div>" .->22
+        14-. "<div>Envía mensajes</div><div style='font-size: 70%'></div>" .->22
+        17-. "<div>Envía y recibe mensajes</div><div style='font-size: 70%'></div>" .->22
+        11-. "<div>JDBC</div><div style='font-size: 70%'></div>" .->26
+        14-. "<div>JDBC</div><div style='font-size: 70%'></div>" .->28
+        17-. "<div>JDBC</div><div style='font-size: 70%'></div>" .->30
+        1-. "<div>Uses</div><div style='font-size: 70%'></div>" .->3
+        3-. "<div>Autentica</div><div style='font-size: 70%'></div>" .->6
+        3-. "<div>Pasa peticiones</div><div style='font-size: 70%'></div>" .->8
+    end
+```
