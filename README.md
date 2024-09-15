@@ -128,7 +128,7 @@ all user events from my-relam and my-client: KK.EVENT.*.MY-REALM.*.MY-CLIENT.USE
 - https://www.baeldung.com/spring-boot-keycloak
 - https://medium.com/@bcarunmail/securing-rest-api-using-keycloak-and-spring-oauth2-6ddf3a1efcc2
 - https://www.baeldung.com/postman-keycloak-endpoints#1-openid-configuration-endpoint
-
+- https://medium.com/@agayevilkin76/api-gateway-swagger-ui-config-for-spring-boot-6d51a0294a34
 
 # modelo c4  
 ## https://structurizr.com/dsl
