@@ -14,6 +14,7 @@ spring:
     hikari:
       connection-timeout: 30000
       maximum-pool-size: 10
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -28,7 +29,8 @@ spring:
   docker:
     compose:
       file: ./docker/services.yaml
-      lifecycle-management: start-only
+      lifecycle-management: start_only
+      enabled: true
 
 error:
   handling:
@@ -40,6 +42,7 @@ error:
     codes:
       TestNameUnique: TEST_NAME_UNIQUE
 # swagger y keycloak integration
+# http://localhost:8080/swagger-ui/index.html
 springdoc:
   oauth2:
     authorization-url: "http://localhost:9090/realms/videoclub/protocol/openid-connect/auth"
