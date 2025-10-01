@@ -40,7 +40,9 @@ public class OpenApi30Config {
                                         .authorizationUrl(authorizationUrl)
                                         .scopes(new Scopes()
                                                 .addString("openid", "OpenID Connect scope")
-                                                .addString("videocloud", "Access to VideoCloud services"))))));
+                                                .addString("profile", "Profile scope")
+                                                .addString("test", "test")
+                                                .addString("email", "Email scope"))))));
     }
 
     @Bean

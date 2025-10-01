@@ -8,7 +8,8 @@ Content-Type: application/x-www-form-urlencoded
 client_id = web &
 username = usuarioadmin &
 password = usuarioadmin &
-grant_type = password 
+grant_type = password &
+scope = openid
 
 > {%
     client.test("Request executed successfully", function () {
@@ -23,9 +24,9 @@ POST http://{{host}}:9090/realms/videoclub/protocol/openid-connect/token
 Content-Type: application/x-www-form-urlencoded
 
 client_id = test-api &
-client_secret = la0ibHyKdfUm4QHX7Em7iD73neLWjKk3 &
-grant_type = client_credentials
-
+client_secret = dstNSsANvqlaGfZCJa1mcYzP1EBAYP4N &
+grant_type = client_credentials &
+scope = openid test
 > {%
     client.test("Request executed successfully", function () {
         client.assert(response.status === 200, "Response status is not 200");
@@ -46,7 +47,7 @@ Authorization: Bearer {{access_token}}
 
 ###
 # @name api List get (with login and admin Role)
-GET http://{{host}}:9500/catalogo/tests
+GET http://{{host}}:9500/api/tests
 Authorization: Bearer {{access_token}}
 
 > {%
