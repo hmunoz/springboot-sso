@@ -47,7 +47,7 @@ Authorization: Bearer {{access_token}}
 
 ###
 # @name api List get (with login and admin Role)
-GET http://{{host}}:9500/api/tests
+GET http://{{host}}:9500/catalogo/tests
 Authorization: Bearer {{access_token}}
 
 > {%

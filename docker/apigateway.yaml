@@ -1,18 +1,21 @@
 name: videoclub
 services:
   gateway:
-    image: hmunoz79/apigateway:1.5
-    extra_hosts:
-      - "host.docker.internal:${HOST_IP}"
+    image: registry.gitlab.com/public-unrn/apigateway:1.0
+    #extra_hosts:
+    #  - "host.docker.internal:${HOST_IP}"
     ports:
       - "9500:9500"
     environment:
       SPRING_SERVER_PORT: 9500
-      SPRING_CLOUD_GATEWAY_ROUTES[0]_URI: http://host.docker.internal:8080
-      SPRING_CLOUD_GATEWAY_ROUTES[0]_ID: service-catalogo
-      SPRING_CLOUD_GATEWAY_ROUTES[0]_PREDICATES[0]: Path= /catalogo/**
-      SPRING_CLOUD_GATEWAY_ROUTES[0]_FILTERS[0]: StripPrefix=1
-      SPRING_CLOUD_GATEWAY_ROUTES[1]_URI: http://host.docker.internal:8080
-      SPRING_CLOUD_GATEWAY_ROUTES[1]_ID: service-notificaciones
-      SPRING_CLOUD_GATEWAY_ROUTES[1]_PREDICATES[0]: Path= /gateway/**
-      SPRING_CLOUD_GATEWAY_ROUTES[1]_FILTERS[0]: StripPrefix=1
+      SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES[0]_URI: http://host.docker.internal:8080
+      SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES[0]_ID: service-catalogo
+      SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES[0]_PREDICATES[0]: Path= /catalogo/**
+      SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES[0]_FILTERS[0]: StripPrefix=1
+      SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES[1]_URI: http://host.docker.internal:8080
+      SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES[1]_ID: service-notificaciones
+      SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES[1]_PREDICATES[0]: Path= /gateway/**
+      SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES[1]_FILTERS[0]: StripPrefix=1
+      SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_GLOBALCORS_CORS-CONFIGURATIONS[/**]_ALLOWEDORIGINS: http://localhost:5173
+      SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_GLOBALCORS_CORS-CONFIGURATIONS[/**]_ALLOWEDMETHODS: "*"
+      SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_GLOBALCORS_CORS-CONFIGURATIONS[/**]_ALLOWEDHEADERS: "*"
