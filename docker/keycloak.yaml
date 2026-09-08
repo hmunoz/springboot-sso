@@ -19,7 +19,7 @@ services:
       RABBITMQ_VHOST: ${RABBITMQ_DEFAULT_VHOST}
       RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE}
     ports:
-      - 9091:8080
+      - "${KEYCLOAK_PORT:-9090}:8080"
     # json export tiene realm videoclub, client test-api y web, usuario, grupos y roles
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
