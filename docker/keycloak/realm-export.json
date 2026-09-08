@@ -1,10 +1,6 @@
 {
   "id": "4bcc68c6-f2d8-435b-bcab-fe55b4c30d80",
   "realm": "videoclub",
-  "eventsEnabled": true,
-  "eventsListeners": ["jboss-logging", "rabbitmq-event-listener"],
-  "adminEventsEnabled": true,
-  "adminEventsDetailsEnabled": true,
   "notBefore": 0,
   "defaultSignatureAlgorithm": "RS256",
   "revokeRefreshToken": false,
@@ -1795,7 +1791,7 @@
   "eventsExpiration": 3600,
   "eventsListeners": [
     "jboss-logging",
-    "keycloak-to-rabbitmq"
+    "rabbitmq-event-listener"
   ],
   "enabledEventTypes": [
     "SEND_RESET_PASSWORD",
@@ -1887,7 +1883,7 @@
     "IDENTITY_PROVIDER_FIRST_LOGIN_ERROR"
   ],
   "adminEventsEnabled": true,
-  "adminEventsDetailsEnabled": false,
+  "adminEventsDetailsEnabled": true,
   "identityProviders": [],
   "identityProviderMappers": [],
   "components": {
