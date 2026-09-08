@@ -45,7 +45,7 @@ error:
 # http://localhost:8080/swagger-ui/index.html
 springdoc:
   oauth2:
-    authorization-url: "${KEYCLOAK_AUTH_URL:${KEYCLOAK_URL:http://localhost:9090}/realms/${KEYCLOAK_REALM:videoclub}/protocol/openid-connect/auth}"
+    authorization-url: "${KEYCLOAK_AUTH_URL:${KEYCLOAK_URL:http://localhost:9091}/realms/${KEYCLOAK_REALM:videoclub}/protocol/openid-connect/auth}"
   api-docs:
     enabled: true
     path: "/api-docs"
