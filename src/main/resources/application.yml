@@ -37,16 +37,10 @@ spring:
       file: ./docker/services.yaml
       lifecycle-management: start_only
       enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
 
-error:
-  handling:
-    http-status-in-json-response: true
-    exception-logging: NO_LOGGING
-    full-stacktrace-http-statuses: 5xx
-    log-levels:
-      5xx: ERROR
-    codes:
-      MovieTitleUnique: MOVIE_TITLE_UNIQUE
 # swagger y keycloak integration
 # http://localhost:8080/swagger-ui/index.html
 springdoc:
