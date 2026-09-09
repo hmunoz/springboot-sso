@@ -1,38 +1,23 @@
 # VideoClub con Seguridad
 
+@host = localhost
+@access_token = {{login.response.body.access_token}}
+@access_token_api = {{login_api.response.body.access_token}}
+
 ###
-# @name keycloak get token (web angular react)
+# @name login
 POST http://{{host}}:9091/realms/videoclub/protocol/openid-connect/token
 Content-Type: application/x-www-form-urlencoded
 
-client_id = videoclub-frontend &
-username = usuarioadmin &
-password = usuarioadmin &
-grant_type = password &
-scope = openid
-
-> {%
-    client.test("Request executed successfully", function () {
-        client.assert(response.status === 200, "Response status is not 200");
-        client.global.set("access_token", response.body.access_token);
-    });
-%}
+client_id=videoclub-frontend&username=usuarioadmin&password=usuarioadmin&grant_type=password&scope=openid
 
 ###
-# @name keycloak get token (api)
+# @name login_api
 POST http://{{host}}:9091/realms/videoclub/protocol/openid-connect/token
 Content-Type: application/x-www-form-urlencoded
 
-client_id = videoclub-backend &
-client_secret = dstNSsANvqlaGfZCJa1mcYzP1EBAYP4N &
-grant_type = client_credentials &
-scope = openid test
-> {%
-    client.test("Request executed successfully", function () {
-        client.assert(response.status === 200, "Response status is not 200");
-        client.global.set("access_token_api", response.body.access_token);
-    });
-%}
+client_id=videoclub-backend&client_secret=dstNSsANvqlaGfZCJa1mcYzP1EBAYP4N&grant_type=client_credentials&scope=openid
+
 
 ###
 # @name api List get (with login and admin Role)
