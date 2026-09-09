@@ -64,6 +64,13 @@ springdoc:
       realm: ${KEYCLOAK_REALM:videoclub}
       use-pkce-with-authorization-code-grant: true
 
+keycloak:
+  admin:
+    url: ${KEYCLOAK_URL:http://localhost:9091}
+    realm: ${KEYCLOAK_REALM:videoclub}
+    client-id: ${KEYCLOAK_BACKEND_CLIENT_ID:videoclub-backend}
+    client-secret: ${KEYCLOAK_BACKEND_CLIENT_SECRET:dstNSsANvqlaGfZCJa1mcYzP1EBAYP4N}
+
 server:
   port: ${SERVER_PORT:8080}
   error:

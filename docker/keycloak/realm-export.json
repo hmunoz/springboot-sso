@@ -353,6 +353,24 @@
           "clientRole": true,
           "containerId": "bd838c70-f569-4a8b-ad84-ae99f426038d",
           "attributes": {}
+        },
+        {
+          "id": "78c9e511-2981-47c4-8b2a-c3e84cb59905",
+          "name": "user-permission-read",
+          "description": "Read user data",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "bd838c70-f569-4a8b-ad84-ae99f426038d",
+          "attributes": {}
+        },
+        {
+          "id": "78c9e511-2981-47c4-8b2a-c3e84cb59906",
+          "name": "user-permission-create",
+          "description": "Create new users",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "bd838c70-f569-4a8b-ad84-ae99f426038d",
+          "attributes": {}
         }
       ],
       "security-admin-console": [],
@@ -480,7 +498,9 @@
               "movie-permission-read",
               "movie-permission-create",
               "movie-permission-update",
-              "movie-permission-delete"
+              "movie-permission-delete",
+              "user-permission-read",
+              "user-permission-create"
             ]
           }
         },

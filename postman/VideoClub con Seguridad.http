@@ -78,3 +78,24 @@ GET http://{{host}}:8080/api-docs
     });
 %}
 
+###
+# @name api List users (from Keycloak via declarative HTTP Interface)
+GET http://{{host}}:8080/api/users
+Authorization: Bearer {{access_token}}
+
+###
+# @name api Create user (in Keycloak via declarative HTTP Interface)
+POST http://{{host}}:8080/api/users
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "username": "carloslopez",
+  "email": "carlos.lopez@gmail.com",
+  "firstName": "Carlos",
+  "lastName": "Lopez",
+  "password": "Password123!",
+  "group": "/videoclub-default/cliente"
+}
+
+
