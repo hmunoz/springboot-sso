@@ -5,7 +5,7 @@
 POST http://{{host}}:9091/realms/videoclub/protocol/openid-connect/token
 Content-Type: application/x-www-form-urlencoded
 
-client_id = web &
+client_id = videoclub-frontend &
 username = usuarioadmin &
 password = usuarioadmin &
 grant_type = password &
@@ -20,10 +20,10 @@ scope = openid
 
 ###
 # @name keycloak get token (api)
-POST http://{{host}}:9090/realms/videoclub/protocol/openid-connect/token
+POST http://{{host}}:9091/realms/videoclub/protocol/openid-connect/token
 Content-Type: application/x-www-form-urlencoded
 
-client_id = test-api &
+client_id = videoclub-backend &
 client_secret = dstNSsANvqlaGfZCJa1mcYzP1EBAYP4N &
 grant_type = client_credentials &
 scope = openid test

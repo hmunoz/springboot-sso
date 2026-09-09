@@ -317,7 +317,44 @@
           "attributes": {}
         }
       ],
-      "web": [],
+      "videoclub-frontend": [
+        {
+          "id": "78c9e511-2981-47c4-8b2a-c3e84cb59901",
+          "name": "movie-permission-read",
+          "description": "Read movie data",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "bd838c70-f569-4a8b-ad84-ae99f426038d",
+          "attributes": {}
+        },
+        {
+          "id": "78c9e511-2981-47c4-8b2a-c3e84cb59902",
+          "name": "movie-permission-create",
+          "description": "Create new movies",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "bd838c70-f569-4a8b-ad84-ae99f426038d",
+          "attributes": {}
+        },
+        {
+          "id": "78c9e511-2981-47c4-8b2a-c3e84cb59903",
+          "name": "movie-permission-update",
+          "description": "Update existing movies",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "bd838c70-f569-4a8b-ad84-ae99f426038d",
+          "attributes": {}
+        },
+        {
+          "id": "78c9e511-2981-47c4-8b2a-c3e84cb59904",
+          "name": "movie-permission-delete",
+          "description": "Delete movies",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "bd838c70-f569-4a8b-ad84-ae99f426038d",
+          "attributes": {}
+        }
+      ],
       "security-admin-console": [],
       "admin-cli": [],
       "account-console": [],
@@ -332,7 +369,7 @@
           "attributes": {}
         }
       ],
-      "test-api": [],
+      "videoclub-backend": [],
       "account": [
         {
           "id": "c164e6d8-a6a5-434e-bd3b-7914132ebec2",
@@ -425,25 +462,46 @@
   },
   "groups": [
     {
-      "id": "0721e221-3f76-4cd5-9d14-775ab8bb70e2",
-      "name": "administrador",
-      "path": "/administrador",
-      "subGroups": [],
-      "attributes": {},
-      "realmRoles": [
-        "ROLE_ADMIN"
+      "id": "e44d32a1-0000-4567-89ab-cdef01234567",
+      "name": "videoclub-default",
+      "path": "/videoclub-default",
+      "subGroups": [
+        {
+          "id": "0721e221-3f76-4cd5-9d14-775ab8bb70e2",
+          "name": "administrador",
+          "path": "/videoclub-default/administrador",
+          "subGroups": [],
+          "attributes": {},
+          "realmRoles": [
+            "ROLE_ADMIN"
+          ],
+          "clientRoles": {
+            "videoclub-frontend": [
+              "movie-permission-read",
+              "movie-permission-create",
+              "movie-permission-update",
+              "movie-permission-delete"
+            ]
+          }
+        },
+        {
+          "id": "b867bbdb-ea8e-40ec-8652-8550411ec36e",
+          "name": "cliente",
+          "path": "/videoclub-default/cliente",
+          "subGroups": [],
+          "attributes": {},
+          "realmRoles": [
+            "ROLE_CLIENT"
+          ],
+          "clientRoles": {
+            "videoclub-frontend": [
+              "movie-permission-read"
+            ]
+          }
+        }
       ],
-      "clientRoles": {}
-    },
-    {
-      "id": "b867bbdb-ea8e-40ec-8652-8550411ec36e",
-      "name": "cliente",
-      "path": "/cliente",
-      "subGroups": [],
       "attributes": {},
-      "realmRoles": [
-        "ROLE_CLIENT"
-      ],
+      "realmRoles": [],
       "clientRoles": {}
     }
   ],
@@ -518,7 +576,7 @@
       ],
       "notBefore": 0,
       "groups": [
-        "administrador"
+        "/videoclub-default/administrador"
       ]
     },
     {
@@ -541,27 +599,42 @@
       ],
       "notBefore": 0,
       "groups": [
-        "cliente"
+        "/videoclub-default/cliente"
       ]
     },
     {
       "id": "de51c71a-319e-483c-bc64-fbf11899efb1",
-      "username": "service-account-test-api",
+      "username": "service-account-videoclub-backend",
       "emailVerified": false,
       "createdTimestamp": 1723930552302,
       "enabled": true,
       "totp": false,
-      "serviceAccountClientId": "test-api",
+      "serviceAccountClientId": "videoclub-backend",
       "disableableCredentialTypes": [],
       "requiredActions": [],
       "realmRoles": [
         "default-roles-videoclub"
       ],
+      "clientRoles": {
+        "realm-management": [
+          "manage-users",
+          "view-users",
+          "query-users",
+          "query-groups"
+        ]
+      },
       "notBefore": 0,
       "groups": []
     }
   ],
   "scopeMappings": [
+    {
+      "client": "videoclub-frontend",
+      "roles": [
+        "ROLE_ADMIN",
+        "ROLE_CLIENT"
+      ]
+    },
     {
       "clientScope": "videoclub",
       "roles": [
@@ -880,9 +953,9 @@
     },
     {
       "id": "80dcf363-11dd-459a-9a7c-61dc4ed27890",
-      "clientId": "test-api",
-      "name": "test-api",
-      "description": "test-api",
+      "clientId": "videoclub-backend",
+      "name": "videoclub-backend",
+      "description": "Confidential Client para el Backend API de VideoClub",
       "rootUrl": "",
       "adminUrl": "",
       "baseUrl": "",
@@ -890,7 +963,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "**********",
+      "secret": "dstNSsANvqlaGfZCJa1mcYzP1EBAYP4N",
       "redirectUris": [
         "http://localhost:8080/swagger-ui/*",
         "https://oauthdebugger.com/debug"
@@ -903,7 +976,7 @@
       "bearerOnly": false,
       "consentRequired": false,
       "standardFlowEnabled": true,
-      "implicitFlowEnabled": true,
+      "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": true,
       "publicClient": false,
@@ -997,9 +1070,9 @@
     },
     {
       "id": "bd838c70-f569-4a8b-ad84-ae99f426038d",
-      "clientId": "web",
-      "name": "",
-      "description": "",
+      "clientId": "videoclub-frontend",
+      "name": "videoclub-frontend",
+      "description": "Frontend SPA de VideoClub",
       "rootUrl": "",
       "adminUrl": "",
       "baseUrl": "",
@@ -1015,7 +1088,9 @@
         "https://editor.swagger.io/*"
       ],
       "webOrigins": [
+        "+",
         "/*",
+        "http://localhost:8080",
         "http://localhost:3000",
         "http://localhost:5173"
       ],
@@ -1023,13 +1098,14 @@
       "bearerOnly": false,
       "consentRequired": false,
       "standardFlowEnabled": true,
-      "implicitFlowEnabled": true,
+      "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
       "publicClient": true,
       "frontchannelLogout": true,
       "protocol": "openid-connect",
       "attributes": {
+        "pkce.code.challenge.method": "S256",
         "client.introspection.response.allow.jwt.claim.enabled": "false",
         "login_theme": "keycloak",
         "post.logout.redirect.uris": "http://localhost:8080/swagger-ui/*##http://localhost:5173/*",
@@ -1047,21 +1123,37 @@
         "token.response.type.bearer.lower-case": "false"
       },
       "authenticationFlowBindingOverrides": {},
-      "fullScopeAllowed": true,
+      "fullScopeAllowed": false,
       "nodeReRegistrationTimeout": -1,
+      "protocolMappers": [
+        {
+          "id": "e44d32a1-1234-4567-89ab-cdef01234567",
+          "name": "Group Mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "groups",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ],
       "defaultClientScopes": [
         "web-origins",
         "acr",
         "roles",
         "profile",
         "basic",
-        "email"
+        "email",
+        "videoclub"
       ],
       "optionalClientScopes": [
         "address",
         "phone",
         "offline_access",
-        "videoclub",
         "microprofile-jwt"
       ]
     }

@@ -20,7 +20,7 @@ services:
       RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE}
     ports:
       - "${KEYCLOAK_PORT:-9090}:8080"
-    # json export tiene realm videoclub, client test-api y web, usuario, grupos y roles
+    # json export tiene realm videoclub, client videoclub-backend y videoclub-frontend, usuario, grupos y roles
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
       - ./keycloak/keycloak-spi/target/keycloak-spi-1.0.0.jar:/opt/keycloak/providers/keycloak-spi.jar

@@ -52,6 +52,7 @@ error:
 springdoc:
   oauth2:
     authorization-url: "${KEYCLOAK_AUTH_URL:${KEYCLOAK_URL:http://localhost:9091}/realms/${KEYCLOAK_REALM:videoclub}/protocol/openid-connect/auth}"
+    token-url: "${KEYCLOAK_TOKEN_URL:${KEYCLOAK_URL:http://localhost:9091}/realms/${KEYCLOAK_REALM:videoclub}/protocol/openid-connect/token}"
   api-docs:
     enabled: true
     path: "/api-docs"
@@ -59,8 +60,9 @@ springdoc:
     path: "/swagger-ui.html"
     url: "/api-docs"
     oauth:
-      client-id: ${KEYCLOAK_CLIENT_ID:web}
+      client-id: ${KEYCLOAK_CLIENT_ID:videoclub-frontend}
       realm: ${KEYCLOAK_REALM:videoclub}
+      use-pkce-with-authorization-code-grant: true
 
 server:
   port: ${SERVER_PORT:8080}

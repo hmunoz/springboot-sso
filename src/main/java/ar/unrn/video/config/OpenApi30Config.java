@@ -17,6 +17,9 @@ public class OpenApi30Config {
     @Value("${springdoc.oauth2.authorization-url}")
     private String authorizationUrl;
 
+    @Value("${springdoc.oauth2.token-url}")
+    private String tokenUrl;
+
     @Bean
     public OpenAPI openApiSpec() {
         return new OpenAPI().components(new Components()
@@ -32,16 +35,16 @@ public class OpenApi30Config {
                         .addProperty("property", new StringSchema())
                         .addProperty("rejectedValue", new ObjectSchema())
                         .addProperty("path", new StringSchema()))
-                // bearerAuth  keycloak
+                // bearerAuth keycloak (Authorization Code with PKCE)
                 .addSecuritySchemes("bearerAuth", new io.swagger.v3.oas.models.security.SecurityScheme()
                         .type(io.swagger.v3.oas.models.security.SecurityScheme.Type.OAUTH2)
                         .flows(new io.swagger.v3.oas.models.security.OAuthFlows()
-                                .implicit(new io.swagger.v3.oas.models.security.OAuthFlow()
+                                .authorizationCode(new io.swagger.v3.oas.models.security.OAuthFlow()
                                         .authorizationUrl(authorizationUrl)
+                                        .tokenUrl(tokenUrl)
                                         .scopes(new Scopes()
                                                 .addString("openid", "OpenID Connect scope")
                                                 .addString("profile", "Profile scope")
-                                                .addString("test", "test")
                                                 .addString("email", "Email scope"))))));
     }
 
