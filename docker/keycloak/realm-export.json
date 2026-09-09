@@ -1,6 +1,9 @@
 {
   "id": "4bcc68c6-f2d8-435b-bcab-fe55b4c30d80",
   "realm": "videoclub",
+  "displayName": "VideoClub SSO",
+  "displayNameHtml": "VideoClub SSO",
+  "loginTheme": "videoclub",
   "notBefore": 0,
   "defaultSignatureAlgorithm": "RS256",
   "revokeRefreshToken": false,
@@ -1094,7 +1097,7 @@
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "client.introspection.response.allow.jwt.claim.enabled": "false",
-        "login_theme": "keycloak",
+        "login_theme": "videoclub",
         "post.logout.redirect.uris": "http://localhost:8080/swagger-ui/*##http://localhost:5173/*",
         "oauth2.device.authorization.grant.enabled": "false",
         "backchannel.logout.revoke.offline.tokens": "false",
