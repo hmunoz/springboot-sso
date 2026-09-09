@@ -68,27 +68,9 @@
         "attributes": {}
       },
       {
-        "id": "78c9e511-2981-47c4-8b2a-c3e84cb59803",
-        "name": "ROLE_CLIENT",
-        "description": "",
-        "composite": false,
-        "clientRole": false,
-        "containerId": "4bcc68c6-f2d8-435b-bcab-fe55b4c30d80",
-        "attributes": {}
-      },
-      {
         "id": "108d4e69-436f-431d-acf0-6a362aa484c5",
         "name": "offline_access",
         "description": "${role_offline-access}",
-        "composite": false,
-        "clientRole": false,
-        "containerId": "4bcc68c6-f2d8-435b-bcab-fe55b4c30d80",
-        "attributes": {}
-      },
-      {
-        "id": "116afe99-5524-4c0f-8741-5fac41cfcd34",
-        "name": "ROLE_ADMIN",
-        "description": "",
         "composite": false,
         "clientRole": false,
         "containerId": "4bcc68c6-f2d8-435b-bcab-fe55b4c30d80",
@@ -490,9 +472,7 @@
           "path": "/videoclub-default/administrador",
           "subGroups": [],
           "attributes": {},
-          "realmRoles": [
-            "ROLE_ADMIN"
-          ],
+          "realmRoles": [],
           "clientRoles": {
             "videoclub-frontend": [
               "movie-permission-read",
@@ -510,9 +490,7 @@
           "path": "/videoclub-default/cliente",
           "subGroups": [],
           "attributes": {},
-          "realmRoles": [
-            "ROLE_CLIENT"
-          ],
+          "realmRoles": [],
           "clientRoles": {
             "videoclub-frontend": [
               "movie-permission-read"
@@ -651,20 +629,6 @@
     }
   ],
   "scopeMappings": [
-    {
-      "client": "videoclub-frontend",
-      "roles": [
-        "ROLE_ADMIN",
-        "ROLE_CLIENT"
-      ]
-    },
-    {
-      "clientScope": "videoclub",
-      "roles": [
-        "ROLE_CLIENT",
-        "ROLE_ADMIN"
-      ]
-    },
     {
       "clientScope": "offline_access",
       "roles": [
@@ -1398,22 +1362,6 @@
             "introspection.token.claim": "true",
             "access.token.claim": "true",
             "userinfo.token.claim": "true"
-          }
-        },
-        {
-          "id": "d0a600d1-680a-447f-a50d-0a9e23c1b5c0",
-          "name": "groups",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-usermodel-realm-role-mapper",
-          "consentRequired": false,
-          "config": {
-            "introspection.token.claim": "true",
-            "multivalued": "true",
-            "user.attribute": "foo",
-            "id.token.claim": "true",
-            "access.token.claim": "true",
-            "claim.name": "groups",
-            "jsonType.label": "String"
           }
         },
         {

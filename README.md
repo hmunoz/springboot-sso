@@ -78,10 +78,12 @@ VITE_API_BASE_URL=http://localhost:8080
 
 ## Usuarios de prueba
 
-| Usuario | Contraseña | Grupo | Permisos |
+| Usuario | Contraseña | Grupo (identidad) | Permisos (autorización) |
 | --- | --- | --- | --- |
-| `usuarioadmin` | `usuarioadmin` | `/videoclub-default/administrador` | `ROLE_ADMIN` + CRUD de películas + gestión de usuarios |
-| `usuariocliente` | `usuariocliente` | `/videoclub-default/cliente` | `ROLE_CLIENT` + solo lectura de películas |
+| `usuarioadmin` | `usuarioadmin` | `/videoclub-default/administrador` | CRUD de películas + gestión de usuarios |
+| `usuariocliente` | `usuariocliente` | `/videoclub-default/cliente` | solo lectura de películas |
+
+> El modelo separa **quién sos** de **qué podés hacer**: el grupo es el cargo, los client roles son las llaves que ese cargo trae. El realm no define roles propios — no hay `ROLE_ADMIN`, sería un tercer mecanismo diciendo lo que el grupo ya dice. Detalle completo en la [§6 de la guía](docs/seguridad-oauth2-openid-connect-keycloak.md).
 
 Quien se registre por su cuenta desde el formulario de Keycloak entra automáticamente al grupo `cliente` y debe configurar TOTP en el primer login.
 
@@ -167,9 +169,9 @@ En lugar de capturas de pantalla —que envejecen con cada release de Keycloak y
 
 | Qué ver | Ruta en la consola |
 | --- | --- |
-| Roles de realm (`ROLE_ADMIN`, `ROLE_CLIENT`) | *Realm roles* |
 | Permisos de grano fino (`movie-permission-*`, `user-permission-*`) | *Clients → videoclub-frontend → Roles* |
-| Grupos y sus roles asignados | *Groups → videoclub-default → administrador / cliente → Role mapping* |
+| Grupos y los permisos que traen | *Groups → videoclub-default → administrador / cliente → Role mapping* |
+| Que el realm **no** define roles propios | *Realm roles* (solo los de Keycloak) |
 | Grupo por defecto al auto-registrarse | *Realm settings → User registration → Default groups* |
 | TOTP obligatorio | *Authentication → Required actions → Configure OTP* |
 | Mappers que arman los claims del token | *Client scopes → videoclub → Mappers* |

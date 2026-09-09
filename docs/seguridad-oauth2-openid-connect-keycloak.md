@@ -13,7 +13,7 @@ Esta guía está diseñada como material pedagógico y de referencia arquitectó
 3. [Clientes públicos vs. confidenciales](#3-clientes-en-keycloak-públicos-vs-confidenciales)
 4. [Flujos de autorización](#4-flujos-de-autorización-grant-types)
 5. [Ciclo de vida de identidades y MFA](#5-gestión-del-ciclo-de-vida-de-identidades-en-keycloak)
-6. [Roles, grupos y token bloat](#6-modelado-de-roles-grupos-y-prevención-de-token-bloat)
+6. [Grupos como identidad, roles como permisos](#6-modelado-grupos-como-identidad-roles-como-permisos)
 7. [Anatomía del client scope: del rol al claim](#7-anatomía-del-client-scope-videoclub-del-rol-al-preauthorize)
 
 **Implementación**
@@ -180,13 +180,13 @@ sequenceDiagram
 Para permitir que nuevos usuarios se registren por sí mismos en la plataforma respetando el **Principio de Menor Privilegio**:
 
 1. **Auto-registro activado (`registrationAllowed: true`)**: Habilita el enlace "Registrarse" en el formulario de login de Keycloak.
-2. **Grupo por defecto (`defaultGroups: ["/videoclub-default/cliente"]`)**: Todo usuario que se registre se incorpora automáticamente al grupo de clientes, heredando `ROLE_CLIENT` y `movie-permission-read`. De este modo, no tiene permisos administrativos ni acceso a la gestión de otros usuarios.
+2. **Grupo por defecto (`defaultGroups: ["/videoclub-default/cliente"]`)**: Todo usuario que se registre se incorpora automáticamente al grupo de clientes, heredando su único permiso: `movie-permission-read`. De este modo, no tiene permisos administrativos ni acceso a la gestión de otros usuarios.
 
 ```mermaid
 graph LR
     Reg["Nuevo Usuario se Registra"] -->|"Keycloak Realm"| KC["Asigna defaultGroups"]
     KC --> Group["/videoclub-default/cliente"]
-    Group --> Roles["ROLE_CLIENT + movie-permission-read"]
+    Group --> Roles["movie-permission-read"]
     Group -.->|"Sin permisos"| NoAdmin["Sin user-permission-*"]
 ```
 
@@ -218,11 +218,26 @@ sequenceDiagram
 
 ---
 
-## 6. Modelado de Roles, Grupos y Prevención de "Token Bloat"
+## 6. Modelado: Grupos como Identidad, Roles como Permisos
 
-### Jerarquía de Roles y Separación de Dominios
+### La decisión de diseño
 
-Para aplicar el principio de menor privilegio, separamos los dominios de datos:
+Keycloak ofrece tres mecanismos que se solapan —roles de realm, roles de cliente y grupos— y la tentación de usar los tres a la vez termina siempre igual: tres formas distintas de responder "¿este usuario es administrador?", que tarde o temprano se contradicen.
+
+Este proyecto usa **dos conceptos, y son ortogonales**:
+
+| Mecanismo | Responde | Ejemplo | ¿Decide accesos? |
+| --- | --- | --- | --- |
+| **Grupo** | ¿Quién sos en la organización? | `administrador`, `cliente` | **No** |
+| **Client role** | ¿Qué podés hacer? | `movie-permission-create` | **Sí, siempre** |
+
+La analogía es la de un edificio: **el grupo es el cargo, los roles son las llaves que ese cargo trae en el llavero**. Uno cambia de cargo y le cambian el llavero; la cerradura de la sala de servidores no pregunta el cargo, pregunta por la llave.
+
+> **Por eso el realm no define roles de realm propios.** No hay `ROLE_ADMIN` ni `ROLE_CLIENT`: serían un tercer mecanismo diciendo lo que el grupo ya dice. La pertenencia al grupo `administrador` **es** la identidad; los seis permisos que ese grupo trae **son** la autorización. Un concepto, un lugar.
+
+### Jerarquía y separación de dominios
+
+Los permisos se nombran por dominio de datos y por operación, nunca por cargo:
 
 1. **Dominio Películas**: `movie-permission-read`, `movie-permission-create`, `movie-permission-update`, `movie-permission-delete`.
 2. **Dominio Usuarios**: `user-permission-read`, `user-permission-create`.
@@ -230,23 +245,23 @@ Para aplicar el principio de menor privilegio, separamos los dominios de datos:
 ```mermaid
 graph TD
     Root["Grupo Raíz: /videoclub-default"]
-    Root --> Admin["Subgrupo: administrador"]
-    Root --> Cliente["Subgrupo: cliente"]
+    Root --> Admin["Subgrupo: administrador<br/>(identidad)"]
+    Root --> Cliente["Subgrupo: cliente<br/>(identidad)"]
 
-    Admin -->|"Realm Role"| RoleAdmin["ROLE_ADMIN"]
     Admin -->|"Client Roles (videoclub-frontend)"| MovieAdmin["movie-permission-* (CRUD)"]
     Admin -->|"Client Roles (videoclub-frontend)"| UserAdmin["user-permission-* (CR)"]
 
-    Cliente -->|"Realm Role"| RoleClient["ROLE_CLIENT"]
     Cliente -->|"Client Roles (videoclub-frontend)"| MovieRead["movie-permission-read"]
 ```
+
+El usuario nunca recibe un permiso directamente: **se lo asigna a un grupo, y el usuario se agrega al grupo**. Dar de alta un bibliotecario que puede cargar películas pero no borrarlas es crear un grupo con tres permisos, sin tocar una línea de código ni inventar un rol nuevo.
 
 ### Prevención de Token Bloat (`fullScopeAllowed: false`)
 
 Por defecto, Keycloak asocia todos los roles del realm a cada token. Esto infla innecesariamente el tamaño de los headers HTTP en cada petición.
 
 - En `realm-export.json`, configuramos `"fullScopeAllowed": false` en `videoclub-frontend`.
-- Definimos un Scope explícito (`videoclub`) mapeando únicamente los roles de negocio necesarios.
+- Sin roles de realm propios y con esa bandera apagada, el claim `realm_access` **directamente no aparece** en el token. No hay nada que recortar porque no hay nada de más.
 
 > **Asimetría intencional**: `videoclub-backend` mantiene `"fullScopeAllowed": true`. Es un cliente confidencial que actúa como service account contra el Admin API y necesita ver los roles de `realm-management` que tiene asignados. El ahorro de bytes importa en el token que viaja en cada request del browser, no en el token M2M que se pide una vez y se cachea.
 
@@ -270,18 +285,19 @@ graph LR
 
 ### Los mappers del scope `videoclub`
 
-En `realm-export.json`, el client scope `videoclub` define seis mappers. Los dos críticos para la autorización son:
+En `realm-export.json`, el client scope `videoclub` define cinco mappers:
 
 | Mapper | Tipo (`protocolMapper`) | Claim que escribe |
 | --- | --- | --- |
+| **`client roles`** | `oidc-usermodel-client-role-mapper` | **`resource_access.${client_id}.roles`** |
 | `realm roles` | `oidc-usermodel-realm-role-mapper` | `realm_access.roles` |
-| `client roles` | `oidc-usermodel-client-role-mapper` | `resource_access.${client_id}.roles` |
 | `email` | `oidc-usermodel-attribute-mapper` | `email` |
 | `username` | `oidc-usermodel-attribute-mapper` | `preferred_username` |
 | `full name` | `oidc-full-name-mapper` | `name` |
-| `groups` | `oidc-usermodel-realm-role-mapper` | `groups` |
 
-Los dos primeros tienen `"multivalued": "true"` y `"access.token.claim": "true"`: producen arrays dentro del `access_token`, que es exactamente donde el Resource Server los busca.
+**El único que importa para la autorización es `client roles`.** Tiene `"multivalued": "true"` y `"access.token.claim": "true"`: produce el array dentro del `access_token` que el Resource Server convierte en authorities.
+
+El mapper `realm roles` queda por compatibilidad, pero hoy no escribe nada: como el realm no define roles propios (§6), `realm_access` no llega al token.
 
 Notar el detalle de `resource_access.${client_id}.roles`: `${client_id}` es una plantilla que Keycloak resuelve **en tiempo de emisión** al cliente que pidió el token. Por eso el mismo scope sirve para `videoclub-frontend` y para `videoclub-backend` sin duplicar configuración.
 
@@ -304,21 +320,19 @@ Además del scope, el cliente `videoclub-frontend` define su propio mapper:
 
 Con `"full.path": "false"` el claim contiene `["administrador"]` en lugar de `["/videoclub-default/administrador"]`. El hook `usePermissions` del frontend depende de esta forma corta cuando evalúa `groups.includes('administrador')`.
 
-> **Atención — colisión de claims**: el scope `videoclub` también define un mapper llamado `groups`, pero es de tipo `oidc-usermodel-realm-role-mapper`, es decir, escribe **roles de realm** dentro del claim `groups`. Dos mappers apuntando al mismo claim con semánticas distintas es una fuente de confusión garantizada en clase. Es un buen ejercicio de auditoría: decidir cuál de los dos debe sobrevivir. Si el objetivo es exponer pertenencia a grupos, el correcto es el `oidc-group-membership-mapper` del cliente.
+Este mapper es el que materializa la mitad "identidad" del modelo de §6. Es el **único** que escribe el claim `groups`: si hubiera dos mappers apuntando al mismo claim con semánticas distintas, el contenido sería indefinido y la identidad del usuario dejaría de ser confiable.
 
 ### El filtro: `scopeMappings`
 
-Acá se completa lo que §6 dejó a medias. `fullScopeAllowed: false` **apaga** la inclusión automática de todos los roles del realm, pero por sí solo no dice cuáles sí incluir. Eso lo define `scopeMappings`, a nivel del realm:
+`fullScopeAllowed: false` **apaga** la inclusión automática de todos los roles del realm, pero por sí solo no dice cuáles sí incluir. Eso lo define `scopeMappings`, a nivel del realm:
 
 ```json
 "scopeMappings": [
-  { "client":      "videoclub-frontend", "roles": ["ROLE_ADMIN", "ROLE_CLIENT"] },
-  { "clientScope": "videoclub",          "roles": ["ROLE_CLIENT", "ROLE_ADMIN"] },
-  { "clientScope": "offline_access",     "roles": ["offline_access"] }
+  { "clientScope": "offline_access", "roles": ["offline_access"] }
 ]
 ```
 
-Es una lista blanca: de todos los roles de realm que un usuario pueda tener, **solo `ROLE_ADMIN` y `ROLE_CLIENT` llegan al token**. Los roles de infraestructura de Keycloak — `default-roles-videoclub`, `uma_authorization`, `offline_access` — quedan afuera. La aplicación nunca los usa, así que no tienen por qué viajar en cada request HTTP.
+Una sola entrada, y es de Keycloak. Es la consecuencia directa del modelo: **no hay roles de realm de negocio que whitelistear**. Los roles de infraestructura —`default-roles-videoclub`, `uma_authorization`— quedan afuera porque nadie los pidió, y la aplicación nunca los usa.
 
 ### El token resultante
 
@@ -332,21 +346,25 @@ Decodificando el `access_token` de `usuariocliente` (payload, recortado):
   "scope": "openid profile email videoclub",
   "preferred_username": "usuariocliente",
   "email": "usuariocliente@gmail.com",
-  "realm_access": {
-    "roles": ["ROLE_CLIENT"]
-  },
+  "groups": ["cliente"],
   "resource_access": {
     "videoclub-frontend": {
       "roles": ["movie-permission-read"]
     }
-  },
-  "groups": ["cliente"]
+  }
 }
 ```
 
-Ese `realm_access.roles` con **un solo elemento** es la prueba visible de que el token bloat está controlado. Sin `fullScopeAllowed: false` y sin los `scopeMappings`, ese array traería también `default-roles-videoclub`, `offline_access` y `uma_authorization`: cuatro veces más contenido, cero información útil para la aplicación.
+**No hay claim `realm_access`.** No fue recortado: nunca hubo nada que poner adentro. Ese es el token bloat resuelto en su origen — no filtrando ruido, sino no generándolo.
 
-Comparar con el mismo token para `usuarioadmin`: `realm_access.roles` trae `ROLE_ADMIN` y `resource_access.videoclub-frontend.roles` los seis permisos. **Esa diferencia de dos arrays es toda la autorización del sistema.**
+Los dos claims que quedan son exactamente los dos conceptos del modelo:
+
+| Claim | Contenido | Rol en el sistema |
+| --- | --- | --- |
+| `groups` | `["cliente"]` | Identidad — para la UI |
+| `resource_access.videoclub-frontend.roles` | `["movie-permission-read"]` | Autorización — para el backend |
+
+Comparar con el token de `usuarioadmin`: `groups` trae `["administrador"]` y `resource_access` los seis permisos. **Esa diferencia de dos arrays es toda la autorización del sistema.**
 
 ### ¿Por qué el scope viaja explícito?
 
@@ -431,12 +449,14 @@ public CorsConfigurationSource corsConfigurationSource() {
 
 ### Conversión de Claims: `KeycloakGrantedAuthoritiesConverter`
 
-Por defecto, Spring Security busca roles en el claim `scope` o `scp`. Keycloak guarda los roles en:
+Por defecto, Spring Security busca roles en el claim `scope` o `scp`. Keycloak los guarda en otro lado:
 
-- `realm_access.roles` (roles de realm, ej. `ROLE_ADMIN`).
-- `resource_access.<client-id>.roles` (roles de cliente, ej. `movie-permission-read`).
+- `resource_access.<client-id>.roles` (roles de cliente, ej. `movie-permission-read`) — **la fuente real de autorización de este proyecto**.
+- `realm_access.roles` (roles de realm), que acá viene vacío por diseño (§6).
 
-Implementamos un `Converter<Jwt, Collection<GrantedAuthority>>` que extrae ambas estructuras para poder evaluarlas con `@PreAuthorize`:
+Implementamos un `Converter<Jwt, Collection<GrantedAuthority>>` que extrae ambas estructuras para poder evaluarlas con `@PreAuthorize`. Lee `realm_access` aunque hoy no traiga nada: si mañana el realm define un rol propio, el converter ya lo soporta sin cambios.
+
+> Notar qué **no** hace el converter: no toca el claim `groups`. Es deliberado. Los grupos son identidad y sirven para la UI; el backend autoriza únicamente sobre permisos. Si el día de mañana hiciera falta un chequeo grueso del lado del servidor, la respuesta correcta es agregar un permiso, no mapear el grupo a una authority.
 
 ```java
 @Component
@@ -493,17 +513,16 @@ GrantedAuthorityDefaults grantedAuthorityDefaults() {
 }
 ```
 
-Por convención, Spring Security distingue **roles** de **authorities** con un prefijo: `hasRole('ADMIN')` es azúcar sintáctica que internamente busca la authority `ROLE_ADMIN`. Keycloak, en cambio, entrega el rol con el nombre literal que le pusimos: `ROLE_ADMIN`.
+Por convención, Spring Security distingue **roles** de **authorities** con un prefijo: `hasRole('ADMIN')` es azúcar sintáctica que internamente busca la authority `ROLE_ADMIN`. Keycloak, en cambio, entrega cada rol con el nombre literal que le pusimos, sin prefijo alguno: `movie-permission-read`.
 
 Sin este bean, la combinación produce el clásico error silencioso:
 
 | Anotación | Authority que Spring busca | ¿Coincide con el token? |
 | --- | --- | --- |
-| `hasRole('ROLE_ADMIN')` | `ROLE_ROLE_ADMIN` | ❌ Doble prefijo |
-| `hasRole('ADMIN')` | `ROLE_ADMIN` | ✅ (sin el bean) |
-| `hasAuthority('ROLE_ADMIN')` | `ROLE_ADMIN` | ✅ siempre |
+| `hasRole('movie-permission-read')` | `ROLE_movie-permission-read` | ❌ Prefijo fantasma |
+| `hasAuthority('movie-permission-read')` | `movie-permission-read` | ✅ siempre |
 
-Al declarar el prefijo como cadena vacía, `hasRole('X')` y `hasAuthority('X')` pasan a ser equivalentes: ambos comparan contra el nombre literal del token. Por eso en este proyecto **usamos siempre `hasAuthority`** — es explícito, no depende de convenciones ocultas y funciona igual para roles de realm (`ROLE_ADMIN`) que para permisos de cliente (`movie-permission-read`), que en el fondo son la misma cosa: strings dentro de una colección de `GrantedAuthority`.
+Al declarar el prefijo como cadena vacía, `hasRole('X')` y `hasAuthority('X')` pasan a ser equivalentes: ambos comparan contra el nombre literal del token. Aun así, en este proyecto **usamos siempre `hasAuthority`** — es explícito, no depende de una convención invisible, y nombra correctamente lo que se está evaluando: una **autoridad**, no un cargo.
 
 > Un `403` inexplicable con un token que "tiene el rol" es, nueve de cada diez veces, este prefijo. Es el primer lugar donde hay que mirar.
 
@@ -539,7 +558,9 @@ El mapa completo de autorizaciones del proyecto:
 | `GET /api/users` | `user-permission-read` | administrador |
 | `POST /api/users` | `user-permission-create` | administrador |
 
-Observar el diseño: **el permiso se nombra por la operación de negocio, no por el rol**. `ROLE_ADMIN` nunca aparece en un `@PreAuthorize`. Si mañana aparece un rol `ROLE_BIBLIOTECARIO` que puede crear películas pero no borrarlas, se le asigna `movie-permission-create` en Keycloak y **no se toca ni una línea de Java**. Esa es la diferencia entre autorizar por rol y autorizar por permiso.
+Observar el diseño: **el permiso se nombra por la operación de negocio, nunca por el cargo**. En ningún `@PreAuthorize` de este proyecto aparece "admin" o "cliente". Si mañana hace falta un grupo `bibliotecario` que pueda crear películas pero no borrarlas, se crea el grupo en Keycloak con `movie-permission-read` y `movie-permission-create`, y **no se toca ni una línea de Java**.
+
+Ese es el pago concreto del modelo de §6: la identidad organizacional cambia en la consola de Keycloak, el código solo conoce operaciones. Un `@PreAuthorize("hasAuthority('ROLE_ADMIN')")` habría atado el catálogo de películas al organigrama de la empresa — y cada reorganización sería un deploy.
 
 ### Swagger UI como cliente OAuth2 con PKCE
 
@@ -816,25 +837,36 @@ Los tres tienen desventajas. La elección real es **cuál riesgo se prefiere**:
 
 ### Extracción de Permisos: Hook `usePermissions`
 
-Un hook de React que decodifica el JWT del token de acceso y expone métodos de verificación:
+Un hook de React que decodifica el JWT del token de acceso y expone las dos mitades del modelo de §6 —identidad y autorización— como dos funciones distintas y con nombres que no se confunden:
 
 ```typescript
 export function usePermissions() {
   const auth = useAuth();
   const tokenData = parseJwt(auth.user?.access_token);
   const clientRoles = tokenData?.resource_access?.['videoclub-frontend']?.roles || [];
-  const realmRoles = tokenData?.realm_access?.roles || [];
+  const groups = tokenData?.groups || [];
+
+  /** Autorización: qué puede hacer. Toda decisión de acceso se toma con esto. */
+  const hasPermission = (permission: string) => clientRoles.includes(permission);
+
+  /** Identidad: a qué parte de la organización pertenece. Nunca para dar acceso. */
+  const hasGroup = (group: string) => groups.includes(group);
 
   return {
     isAuthenticated: auth.isAuthenticated,
     accessToken: auth.user?.access_token,
-    hasPermission: (perm: string) => clientRoles.includes(perm),
-    hasRole: (role: string) => realmRoles.includes(role),
     clientRoles,
-    realmRoles
+    groups,
+    hasPermission,
+    hasGroup,
+    isAdmin: hasGroup('administrador')
   };
 }
 ```
+
+El comentario de cada función no es decoración: es la única barrera contra que alguien, dentro de seis meses, escriba `hasGroup('administrador')` para decidir si muestra un botón de borrar. Funcionaría — hasta el día que exista un administrador sin permiso de borrado.
+
+`isAdmin` existe porque "¿es admin?" es una pregunta legítima para la **presentación** (un saludo, un badge, un panel de bienvenida distinto). No es una pregunta legítima para dar acceso a nada.
 
 > **Decodificar no es validar.** `parseJwt` hace `atob()` sobre el payload: lee el token, **no verifica la firma**. Cualquier usuario puede abrir las DevTools, fabricar un JWT con `"roles": ["user-permission-create"]`, guardarlo en `sessionStorage` y ver aparecer la pestaña de administración. No pasa nada: al primer request el backend valida la firma contra el JWKS y responde `401`. Esto lleva a la regla más importante de toda la guía, y va en negrita porque es la que más se olvida: **la autorización del frontend es cosmética. La seguridad real vive en el backend, siempre.**
 
@@ -853,7 +885,7 @@ Protege las vistas y muestra un mensaje amigable en caso de rechazo:
 />
 ```
 
-El componente evalúa `permission` y/o `role` con el hook anterior y, si falla, renderiza un cartel de "Acceso Restringido (HTTP 403 Forbidden)" indicando exactamente qué autoridad falta. Es intencionalmente didáctico: un producto real no le dice al usuario el nombre interno del permiso que no tiene, pero en clase convierte un rechazo en una lección.
+El componente evalúa **únicamente `permission`** con el hook anterior y, si falla, renderiza un cartel de "Acceso Restringido (HTTP 403 Forbidden)" indicando exactamente qué autoridad falta. No acepta una prop de grupo, y es a propósito: una guarda de ruta es una decisión de acceso, y las decisiones de acceso se toman con permisos. Es intencionalmente didáctico: un producto real no le dice al usuario el nombre interno del permiso que no tiene, pero en clase convierte un rechazo en una lección.
 
 La misma lógica alimenta la navegación en `Layout.tsx` — las pestañas se filtran por `hasPermission`, así que el usuario `cliente` directamente no ve "Gestión Usuarios". **Ocultar y proteger son cosas distintas**: ocultar el link mejora la experiencia, el `PermissionGuard` cubre a quien escribe la URL a mano, y el `@PreAuthorize` del backend es lo único que realmente protege el dato.
 
@@ -1182,9 +1214,10 @@ Es la demostración de que **el mismo flujo de autorización sirve para cualquie
 
 1. Con sesión iniciada en la SPA, abrir DevTools → Application → Session Storage.
 2. Copiar el `access_token` y pegarlo en [jwt.io](https://jwt.io).
-3. Localizar `realm_access.roles`, `resource_access.videoclub-frontend.roles` y `groups`, y contrastar con los mappers de §7.
-4. Comparar el token de `usuariocliente` contra el de `usuarioadmin`: la única diferencia es el contenido de esos arrays.
-5. **Ejercicio de cierre**: modificar el payload a mano, volver a codificarlo en Base64URL y reemplazar el token en el storage. La UI puede llegar a mostrar la pestaña de administración; el backend responde `401` igual, porque la firma ya no valida. Es la demostración práctica de la regla de §11.
+3. Localizar los dos únicos claims que importan: `groups` (identidad) y `resource_access.videoclub-frontend.roles` (autorización). Contrastar con los mappers de §7.
+4. Verificar que **no existe** el claim `realm_access`: es la confirmación de que el modelo de §6 está aplicado y de que no hay un tercer mecanismo escondido.
+5. Comparar el token de `usuariocliente` contra el de `usuarioadmin`: la única diferencia es el contenido de esos dos arrays.
+6. **Ejercicio de cierre**: modificar el payload a mano, volver a codificarlo en Base64URL y reemplazar el token en el storage. La UI puede llegar a mostrar la pestaña de administración; el backend responde `401` igual, porque la firma ya no valida. Es la demostración práctica de la regla de §11.
 
 #### Caso 7: Eventos de Keycloak en vivo (§12)
 

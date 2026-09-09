@@ -17,7 +17,8 @@ public class KeycloakGrantedAuthoritiesConverter implements Converter<Jwt, Colle
     public Collection<GrantedAuthority> convert(Jwt source) {
         Set<GrantedAuthority> authorities = new HashSet<>();
 
-        // Realm roles (e.g. ROLE_ADMIN, ROLE_CLIENT)
+        // Realm roles. The videoclub realm models authorization with client roles only,
+        // so this claim is normally absent; it is read for forward compatibility.
         Map<String, Object> realmAccess = source.getClaimAsMap("realm_access");
         if (realmAccess != null && realmAccess.get("roles") instanceof List<?> roles) {
             roles.stream()
