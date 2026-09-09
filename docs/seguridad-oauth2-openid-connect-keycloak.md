@@ -1,6 +1,6 @@
-# Guía Integral de Seguridad: OAuth 2.0, OpenID Connect y Keycloak con Spring Boot
+# Guía Integral de Seguridad: OAuth 2.0, OpenID Connect y Keycloak con Spring Boot y React 19
 
-Esta guía está diseñada como material pedagógico y de referencia arquitectónica para dictar una clase completa sobre seguridad moderna en aplicaciones web distribuidas. Explica los fundamentos teóricos, los flujos estándar de la industria, las configuraciones en Keycloak y la implementación en el backend con **Spring Boot (Java 25)**.
+Esta guía está diseñada como material pedagógico y de referencia arquitectónica para dictar una clase completa sobre seguridad moderna en aplicaciones web distribuidas. Explica los fundamentos teóricos, los flujos estándar de la industria, las configuraciones en Keycloak, la implementación en el backend con **Spring Boot (Java 25)** y el frontend SPA con **React 19**.
 
 ---
 
@@ -44,7 +44,7 @@ Una de las confusiones más frecuentes en la industria es mezclar estos dos conc
 
 ### Anatomía de los Tokens
 
-1. **`id_token`**: Consumido exclusivamente por el cliente (ej. SPA React/Angular) para personalizar la interfaz (nombre, avatar, email). **Nunca debe enviarse como credencial al backend**.
+1. **`id_token`**: Consumido exclusivamente por el cliente (ej. SPA React 19) para personalizar la interfaz (nombre, avatar, email). **Nunca debe enviarse como credencial al backend**.
 2. **`access_token`**: Credencial enviada en el header `Authorization: Bearer <token>` hacia las APIs del backend.
 3. **`refresh_token`**: Token de larga duración para obtener nuevos `access_token` cuando expiran, sin forzar al usuario a ingresar credenciales nuevamente.
 
@@ -68,7 +68,7 @@ classDiagram
     }
     class VideoclubFrontend {
         +Tipo: Public
-        +Entorno: Browser / SPA
+        +Entorno: Browser / SPA (React 19)
         +Secret: No posee
         +Flujo: Auth Code + PKCE (S256)
     }
@@ -87,6 +87,11 @@ classDiagram
 - **Problema de seguridad**: El código JavaScript corre en el navegador de los usuarios; cualquier usuario puede inspeccionar la memoria o el código fuente. Por ende, **no puede guardar un `client_secret` de forma segura**.
 - **Mecanismo de protección**: **PKCE (Proof Key for Code Exchange)**.
 
+### B. Cliente Confidencial: `videoclub-backend` (Servidor a Servidor)
+
+- Corre en un entorno seguro (el proceso Java de Spring Boot).
+- Almacena un secreto (`client_secret = dstNSsANvqlaGfZCJa1mcYzP1EBAYP4N`) fuera del alcance del público.
+
 ---
 
 ## 4. Flujos de Autorización (Grant Types)
@@ -99,7 +104,7 @@ Este es el flujo obligatorio para aplicaciones web y móviles (SPAs).
 sequenceDiagram
     autonumber
     actor Usuario
-    participant SPA as Frontend (SPA)
+    participant SPA as Frontend (React 19 SPA)
     participant Keycloak as Keycloak (Auth Server)
     participant API as Spring Boot (API)
 
@@ -140,11 +145,56 @@ sequenceDiagram
 
 ---
 
-## 5. Modelado de Roles, Grupos y Prevención de "Token Bloat"
+## 5. Gestión del Ciclo de Vida de Identidades en Keycloak
+
+### Auto-registro y Asignación Automática de Grupos
+
+Para permitir que nuevos usuarios se registren por sí mismos en la plataforma respetando el **Principio de Menor Privilegio**:
+
+1. **Auto-registro activado (`registrationAllowed: true`)**: Habilita el enlace "Registrarse" en el formulario de login de Keycloak.
+2. **Grupo por defecto (`defaultGroups: ["/videoclub-default/cliente"]`)**: Todo usuario que se registre se incorpora automáticamente al grupo de clientes, heredando `ROLE_CLIENT` y `movie-permission-read`. De este modo, no tiene permisos administrativos ni acceso a la gestión de otros usuarios.
+
+```mermaid
+graph LR
+    Reg["Nuevo Usuario se Registra"] -->|"Keycloak Realm"| KC["Asigna defaultGroups"]
+    KC --> Group["/videoclub-default/cliente"]
+    Group --> Roles["ROLE_CLIENT + movie-permission-read"]
+    Group -.->|"Sin permisos"| NoAdmin["Sin user-permission-*"]
+```
+
+### Autenticación Multifactor (MFA/2FA) Obligatoria
+
+Para proteger las cuentas de usuario contra ataques de fuerza bruta y robo de contraseñas, Keycloak implementa **TOTP (Time-based One-Time Password)**:
+
+- **Subflujo `Browser - Conditional OTP`**: Contiene la condición `conditional-user-configured`.
+- **Acción requerida por defecto (`CONFIGURE_TOTP`, `defaultAction: true`)**:
+  - Al registrarse o crearse una cuenta nueva, Keycloak le impone al usuario la tarea obligatoria de configurar un autenticador.
+  - En el primer inicio de sesión, el flujo redirige automáticamente a la pantalla de enrolamiento de segundo factor con el código QR.
+  - Una vez escaneado con Google Authenticator o FreeOTP, la condición se cumple y a partir de ese momento se solicita el código de 6 dígitos en cada login.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Usuario
+    participant Browser
+    participant Keycloak
+
+    Usuario->>Browser: Click en "Registrarse"
+    Browser->>Keycloak: Envía formulario de registro
+    Keycloak->>Keycloak: Crea usuario en /videoclub-default/cliente<br/>y asigna Required Action CONFIGURE_TOTP
+    Keycloak->>Browser: Muestra pantalla de enrolamiento con Código QR
+    Usuario->>Keycloak: Escanea QR en celular e ingresa código de 6 dígitos
+    Keycloak->>Keycloak: Valida y registra credencial TOTP
+    Keycloak->>Browser: Emite sesión y redirige a la SPA
+```
+
+---
+
+## 6. Modelado de Roles, Grupos y Prevención de "Token Bloat"
 
 ### Jerarquía de Roles y Separación de Dominios
 
-Para aplicar el **Principio de Menor Privilegio**, separamos los dominios de datos:
+Para aplicar el principio de menor privilegio, separamos los dominios de datos:
 
 1. **Dominio Películas**: `movie-permission-read`, `movie-permission-create`, `movie-permission-update`, `movie-permission-delete`.
 2. **Dominio Usuarios**: `user-permission-read`, `user-permission-create`.
@@ -172,7 +222,7 @@ Por defecto, Keycloak asocia todos los roles del realm a cada token. Esto infla 
 
 ---
 
-## 6. Implementación en el Backend: Spring Boot Resource Server
+## 7. Implementación en el Backend: Spring Boot Resource Server
 
 ### Configuración en `application.yml`
 
@@ -186,6 +236,24 @@ spring:
         jwt:
           issuer-uri: http://localhost:9091/realms/videoclub
           jwk-set-uri: http://localhost:9091/realms/videoclub/protocol/openid-connect/certs
+```
+
+### Configuración de CORS para el Frontend SPA
+
+En `SecurityConfiguration.java`, registramos un bean `CorsConfigurationSource` para permitir las peticiones cross-origin desde `http://localhost:5173`:
+
+```java
+@Bean
+public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration configuration = new CorsConfiguration();
+    configuration.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:3000"));
+    configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
+    configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With"));
+    configuration.setAllowCredentials(true);
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", configuration);
+    return source;
+}
 ```
 
 ### Conversión de Claims: `KeycloakGrantedAuthoritiesConverter`
@@ -252,7 +320,7 @@ public ResponseEntity<Long> createMovie(@RequestBody @Valid final MovieDTO movie
 
 ---
 
-## 7. Cliente Declarativo HTTP Interface (Spring Boot 4)
+## 8. Cliente Declarativo HTTP Interface (Spring Boot 4)
 
 En Spring Boot 4, el estándar para consumir APIs REST externas son las **Declarative HTTP Interfaces** (anotadas con `@HttpExchange`), reemplazando herramientas pesadas como OpenFeign.
 
@@ -287,7 +355,7 @@ graph LR
 
 ---
 
-## 8. Manejo Global de Excepciones Nativo: RFC 7807 (Problem Details)
+## 9. Manejo Global de Excepciones Nativo: RFC 7807 (Problem Details)
 
 En lugar de utilizar librerías de terceros o devolver respuestas de error dispares, Spring Boot 3+ y 4 estandarizan los errores bajo la norma **RFC 7807 (`application/problem+json`)**.
 
@@ -351,39 +419,71 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 }
 ```
 
-Ejemplo de respuesta devuelta ante un error de validación:
+---
 
-```json
-{
-  "type": "about:blank",
-  "title": "Bad Request",
-  "status": 400,
-  "detail": "Invalid request content.",
-  "instance": "/movies",
-  "invalidFields": {
-    "title": "no debe ser nulo"
-  },
-  "timestamp": "2026-09-09T13:51:05Z"
+## 10. Implementación en el Frontend: SPA con React 19
+
+El frontend [`react-sso`](file:///home/horacio/proyectos/unrn/taller/react-sso) actúa como cliente público y demuestra cómo se traslada la seguridad del token a la experiencia de usuario.
+
+### Configuración OIDC con `oidc-client-ts` y `react-oidc-context`
+
+En `src/config.ts`:
+
+```typescript
+export const userManager = new UserManager({
+  authority: 'http://localhost:9091/realms/videoclub',
+  client_id: 'videoclub-frontend',
+  redirect_uri: window.location.origin + '/',
+  post_logout_redirect_uri: window.location.origin + '/',
+  response_type: 'code', // PKCE activado por defecto
+  scope: 'openid profile email videoclub',
+  userStore: new WebStorageStateStore({ store: window.sessionStorage }),
+  automaticSilentRenew: true
+});
+```
+
+### Extracción de Permisos: Hook `usePermissions`
+
+Un hook de React que decodifica el JWT del token de acceso y expone métodos de verificación:
+
+```typescript
+export function usePermissions() {
+  const auth = useAuth();
+  const tokenData = parseJwt(auth.user?.access_token);
+  const clientRoles = tokenData?.resource_access?.['videoclub-frontend']?.roles || [];
+  const realmRoles = tokenData?.realm_access?.roles || [];
+
+  return {
+    isAuthenticated: auth.isAuthenticated,
+    accessToken: auth.user?.access_token,
+    hasPermission: (perm: string) => clientRoles.includes(perm),
+    hasRole: (role: string) => realmRoles.includes(role),
+    clientRoles,
+    realmRoles
+  };
 }
+```
+
+### Guardas de Rutas: Componente `PermissionGuard`
+
+Protege las vistas y muestra un mensaje amigable en caso de rechazo:
+
+```tsx
+<Route
+  path="/users"
+  element={
+    <PermissionGuard permission="user-permission-read">
+      <UsersView />
+    </PermissionGuard>
+  }
+/>
 ```
 
 ---
 
-## 9. Servicio de Correo y Flujos Asincrónicos (SMTP con MailHog)
+## 11. Laboratorio Práctico: Guía Paso a Paso para la Clase
 
-Keycloak permite verificar emails, recuperar contraseñas y ejecutar acciones obligatorias (*Required Actions*).
-
-- Para desarrollo y testing local, levantamos **MailHog** (`docker/email.yaml`) con:
-  - Servidor SMTP: puerto `1025`.
-  - Interfaz Web de inspección: `http://localhost:8025`.
-- Keycloak envía los correos en texto plano/HTML hacia MailHog sin salir a internet.
-- Los alumnos pueden ver en tiempo real los enlaces de activación con tokens temporales de un solo uso generados por Keycloak.
-
----
-
-## 10. Laboratorio Práctico: Guía Paso a Paso para la Clase
-
-### Paso 1: Levantar los contenedores de infraestructura
+### Paso 1: Levantar la infraestructura
 
 ```bash
 # Red común, base de datos y RabbitMQ
@@ -396,13 +496,18 @@ docker compose -f docker/email.yaml up -d
 docker compose -f docker/keycloak.yaml --env-file docker/.env up -d
 ```
 
-### Paso 2: Iniciar la aplicación Spring Boot
+### Paso 2: Iniciar Backend y Frontend
 
 ```bash
+# Terminal 1: Backend Spring Boot
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+
+# Terminal 2: Frontend React 19
+cd ../react-sso
+npm run dev
 ```
 
-### Paso 3: Casos de Prueba Didácticos (con el archivo `.http` o `curl`)
+### Paso 3: Casos de Prueba Didácticos
 
 #### Caso 1: Intentar acceder a un recurso protegido sin token
 
@@ -410,67 +515,29 @@ docker compose -f docker/keycloak.yaml --env-file docker/.env up -d
 curl -i http://localhost:8080/movies
 ```
 
-- **Resultado esperado**: `401 Unauthorized` (Spring Security rechaza la petición en el filtro de Resource Server).
+- **Resultado esperado**: `401 Unauthorized`.
 
 #### Caso 2: Login como Cliente y verificar restricciones de permisos
 
-1. Obtener token para `usuariocliente`:
-
-   ```bash
-   TOKEN_CLIENTE=$(curl -s -X POST http://localhost:9091/realms/videoclub/protocol/openid-connect/token \
-     -d client_id=videoclub-frontend -d username=usuariocliente -d password=usuariocliente -d grant_type=password | jq -r .access_token)
-   ```
-
-2. Consultar películas:
-
-   ```bash
-   curl -i -H "Authorization: Bearer $TOKEN_CLIENTE" http://localhost:8080/movies
-   ```
-
-   - **Resultado esperado**: `200 OK` (Posee `movie-permission-read`).
-
-3. Intentar crear una película:
-
-   ```bash
-   curl -i -X POST http://localhost:8080/movies \
-     -H "Authorization: Bearer $TOKEN_CLIENTE" \
-     -H "Content-Type: application/json" \
-     -d '{"title": "Inception"}'
-   ```
-
-   - **Resultado esperado**: `403 Forbidden` en formato RFC 7807 (Carece de `movie-permission-create`).
-
-4. Intentar listar usuarios del sistema:
-
-   ```bash
-   curl -i -H "Authorization: Bearer $TOKEN_CLIENTE" http://localhost:8080/api/users
-   ```
-
-   - **Resultado esperado**: `403 Forbidden` (Carece de `user-permission-read`).
+1. Iniciar sesión en `http://localhost:5173` con `usuariocliente` / `usuariocliente`.
+2. Verificar que ve la pestaña **Películas**, pero la pestaña **Usuarios** no aparece en la navegación.
+3. Si intenta forzar la URL `http://localhost:5173/users`, `PermissionGuard` renderiza el mensaje de acceso restringido (403).
 
 #### Caso 3: Login como Administrador y verificar acceso pleno
 
-1. Obtener token para `usuarioadmin`:
+1. Iniciar sesión con `usuarioadmin` / `usuarioadmin`.
+2. Verificar que visualiza ambas pestañas.
+3. Crear una película y dar de alta un nuevo usuario en Keycloak desde la UI.
 
-   ```bash
-   TOKEN_ADMIN=$(curl -s -X POST http://localhost:9091/realms/videoclub/protocol/openid-connect/token \
-     -d client_id=videoclub-frontend -d username=usuarioadmin -d password=usuarioadmin -d grant_type=password | jq -r .access_token)
-   ```
+#### Caso 4: Auto-registro de Usuario y Enrolamiento TOTP en Vivo
 
-2. Crear película:
-
-   - **Resultado esperado**: `201 Created`.
-
-3. Crear un usuario a través del backend:
-
-   ```bash
-   curl -i -X POST http://localhost:8080/api/users \
-     -H "Authorization: Bearer $TOKEN_ADMIN" \
-     -H "Content-Type: application/json" \
-     -d '{"username":"alumno1","email":"alumno1@unrn.edu.ar","firstName":"Juan","lastName":"Perez","password":"Password123!"}'
-   ```
-
-   - **Resultado esperado**: `201 Created` (Spring Boot llama a Keycloak vía HTTP Interface usando M2M y aprovisiona el usuario).
+1. En la pantalla de login de Keycloak (`http://localhost:5173`), hacer click en **"Registrarse"**.
+2. Completar el formulario de registro (ej. `nuevoalumno` / `Password123!`).
+3. Keycloak presentará la pantalla obligatoria de **Configurar OTP** con el código QR.
+4. Escanear el código con la aplicación móvil (Google Authenticator o FreeOTP) e ingresar el token de 6 dígitos.
+5. Al ingresar a la aplicación:
+   - Verificará que solo tiene acceso a **Películas** (incorporado automáticamente a `/videoclub-default/cliente`).
+   - Al cerrar sesión y volver a ingresar, Keycloak exigirá contraseña y el token OTP de 6 dígitos.
 
 ---
 
@@ -480,17 +547,17 @@ curl -i http://localhost:8080/movies
 +-------------------------------------------------------------------------------+
 |                                  BROWSER                                      |
 |                                                                               |
-|  [ React / Angular SPA ]  ====== (1. Auth Code + PKCE) ======> [ KEYCLOAK ]   |
-|            ||                                                        ||       |
-|   (2. Bearer JWT)                                          (Valida firma vía  |
-|            ||                                                    JWKS)        |
-|            \/                                                        \/       |
-|  [ Spring Boot Resource Server ] <===================================+        |
-|            ||                                                                 |
-|    (@HttpExchange)                                                            |
-|    (3. Client Credentials M2M)                                                |
-|            ||                                                                 |
-|            \/                                                                 |
-|  [ Keycloak Admin API ] ===== (Crea usuarios, asigna grupos)                  |
+|  [ React 19 SPA ]  ====== (1. Auth Code + PKCE + OTP) =====> [ KEYCLOAK ]     |
+|         ||                                                        ||          |
+|  (2. Bearer JWT)                                           (Valida firma vía  |
+|         ||                                                       JWKS)        |
+|         \/                                                        \/          |
+|  [ Spring Boot Resource Server ] <================================+           |
+|         ||                                                                    |
+|   (@HttpExchange)                                                             |
+|   (3. Client Credentials M2M)                                                 |
+|         ||                                                                    |
+|         \/                                                                    |
+|  [ Keycloak Admin API ] ===== (Crea usuarios, defaultGroups, TOTP)            |
 +-------------------------------------------------------------------------------+
 ```
