@@ -8,13 +8,13 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class TestDTO {
+public class MovieDTO {
 
     private Long id;
 
     @NotNull
     @Size(max = 255)
-    @TestNameUnique
-    private String name;
+    @MovieTitleUnique
+    private String title;
 
 }

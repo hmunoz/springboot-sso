@@ -4,7 +4,7 @@ import static java.lang.annotation.ElementType.ANNOTATION_TYPE;
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 
-import ar.unrn.video.service.TestService;
+import ar.unrn.video.service.MovieService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
@@ -19,30 +19,30 @@ import org.springframework.web.servlet.HandlerMapping;
 
 
 /**
- * Validate that the name value isn't taken yet.
+ * Validate that the movie title isn't taken yet.
  */
 @Target({ FIELD, METHOD, ANNOTATION_TYPE })
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Constraint(
-        validatedBy = TestNameUnique.TestNameUniqueValidator.class
+        validatedBy = MovieTitleUnique.MovieTitleUniqueValidator.class
 )
-public @interface TestNameUnique {
+public @interface MovieTitleUnique {
 
-    String message() default "{Exists.test.name}";
+    String message() default "{Exists.movie.title}";
 
     Class<?>[] groups() default {};
 
     Class<? extends Payload>[] payload() default {};
 
-    class TestNameUniqueValidator implements ConstraintValidator<TestNameUnique, String> {
+    class MovieTitleUniqueValidator implements ConstraintValidator<MovieTitleUnique, String> {
 
-        private final TestService testService;
+        private final MovieService movieService;
         private final HttpServletRequest request;
 
-        public TestNameUniqueValidator(final TestService testService,
+        public MovieTitleUniqueValidator(final MovieService movieService,
                 final HttpServletRequest request) {
-            this.testService = testService;
+            this.movieService = movieService;
             this.request = request;
         }
 
@@ -54,12 +54,12 @@ public @interface TestNameUnique {
             }
             @SuppressWarnings("unchecked") final Map<String, String> pathVariables =
                     ((Map<String, String>)request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE));
-            final String currentId = pathVariables.get("id");
-            if (currentId != null && value.equalsIgnoreCase(testService.get(Long.parseLong(currentId)).getName())) {
+            final String currentId = pathVariables != null ? pathVariables.get("id") : null;
+            if (currentId != null && value.equalsIgnoreCase(movieService.get(Long.parseLong(currentId)).getTitle())) {
                 // value hasn't changed
                 return true;
             }
-            return !testService.nameExists(value);
+            return !movieService.titleExists(value);
         }
 
     }

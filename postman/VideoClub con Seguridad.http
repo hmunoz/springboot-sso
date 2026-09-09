@@ -2,7 +2,7 @@
 
 ###
 # @name keycloak get token (web angular react)
-POST http://{{host}}:9090/realms/videoclub/protocol/openid-connect/token
+POST http://{{host}}:9091/realms/videoclub/protocol/openid-connect/token
 Content-Type: application/x-www-form-urlencoded
 
 client_id = web &
@@ -36,7 +36,7 @@ scope = openid test
 
 ###
 # @name api List get (with login and admin Role)
-GET http://{{host}}:8080/tests
+GET http://{{host}}:8080/movies
 Authorization: Bearer {{access_token}}
 
 > {%
@@ -47,7 +47,7 @@ Authorization: Bearer {{access_token}}
 
 ###
 # @name api List get (with login and admin Role)
-GET http://{{host}}:9500/catalogo/tests
+GET http://{{host}}:9500/catalogo/movies
 Authorization: Bearer {{access_token}}
 
 > {%

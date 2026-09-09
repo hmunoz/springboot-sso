@@ -13,7 +13,7 @@ import lombok.Setter;
 @Entity
 @Getter
 @Setter
-public class Test {
+public class Movie {
 
     @Id
     @Column(nullable = false, updatable = false)
@@ -30,6 +30,6 @@ public class Test {
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private String name;
+    private String title;
 
 }
