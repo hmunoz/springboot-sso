@@ -33,12 +33,14 @@ public class MovieResource {
 
     @GetMapping
     @Operation(summary = "Get all movies", security = @SecurityRequirement(name = "bearerAuth"))
+    @PreAuthorize("hasAuthority('movie-permission-read')")
     public ResponseEntity<List<MovieDTO>> getAllMovies() {
         return ResponseEntity.ok(movieService.findAll());
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get movie by id", security = @SecurityRequirement(name = "bearerAuth"))
+    @PreAuthorize("hasAuthority('movie-permission-read')")
     public ResponseEntity<MovieDTO> getMovie(@PathVariable(name = "id") final Long id) {
         return ResponseEntity.ok(movieService.get(id));
     }
@@ -46,7 +48,7 @@ public class MovieResource {
     @PostMapping
     @ApiResponse(responseCode = "201")
     @Operation(summary = "Create movie", security = @SecurityRequirement(name = "bearerAuth"))
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('movie-permission-create')")
     public ResponseEntity<Long> createMovie(@RequestBody @Valid final MovieDTO movieDTO) {
         final Long createdId = movieService.create(movieDTO);
         return new ResponseEntity<>(createdId, HttpStatus.CREATED);
@@ -54,7 +56,7 @@ public class MovieResource {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update movie", security = @SecurityRequirement(name = "bearerAuth"))
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('movie-permission-update')")
     public ResponseEntity<Long> updateMovie(@PathVariable(name = "id") final Long id,
             @RequestBody @Valid final MovieDTO movieDTO) {
         movieService.update(id, movieDTO);
@@ -64,7 +66,7 @@ public class MovieResource {
     @DeleteMapping("/{id}")
     @ApiResponse(responseCode = "204")
     @Operation(summary = "Delete movie by id", security = @SecurityRequirement(name = "bearerAuth"))
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('movie-permission-delete')")
     public ResponseEntity<Void> deleteMovie(@PathVariable(name = "id") final Long id) {
         movieService.delete(id);
         return ResponseEntity.noContent().build();
