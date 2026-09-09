@@ -1868,15 +1868,15 @@
     "strictTransportSecurity": "max-age=31536000; includeSubDomains"
   },
   "smtpServer": {
-    "replyToDisplayName": "taller",
+    "replyToDisplayName": "VideoClub Soporte",
     "starttls": "false",
-    "auth": "",
+    "auth": "false",
     "port": "1025",
-    "replyTo": "test@taller.com",
+    "replyTo": "soporte@videoclub.unrn.edu.ar",
     "host": "mailhog",
-    "from": "test@taller.com",
-    "fromDisplayName": "taller",
-    "envelopeFrom": "test@taller.com",
+    "from": "no-reply@videoclub.unrn.edu.ar",
+    "fromDisplayName": "VideoClub",
+    "envelopeFrom": "no-reply@videoclub.unrn.edu.ar",
     "ssl": "false"
   },
   "eventsEnabled": true,
