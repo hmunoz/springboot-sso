@@ -1,5 +1,7 @@
 # springboot-sso y keycloak
 
+> 📘 **Guía Didáctica para Clase**: Consultá el documento completo con diagramas Mermaid y teoría en [`docs/seguridad-oauth2-openid-connect-keycloak.md`](docs/seguridad-oauth2-openid-connect-keycloak.md).
+
 ## OPEN API
 - https://springdoc.org/#spring-data-rest-support
 - http://localhost:8080/swagger-ui/index.html
