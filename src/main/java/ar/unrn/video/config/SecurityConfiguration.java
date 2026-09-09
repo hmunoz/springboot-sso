@@ -32,12 +32,18 @@ class SecurityConfiguration {
         );
 
 
+        org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver bearerTokenResolver =
+                new org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver();
+        bearerTokenResolver.setAllowUriQueryParameter(true);
+
         http
                 .authorizeHttpRequests(registry -> registry
                         .requestMatchers("/actuator/**","/metrics/**", "/swagger-ui/**", "/api-docs/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .oauth2ResourceServer(oauth2Configurer -> oauth2Configurer.jwt(jwtConfigurer -> jwtConfigurer.jwtAuthenticationConverter(jwtAuthenticationConverter())));
+                .oauth2ResourceServer(oauth2Configurer -> oauth2Configurer
+                        .bearerTokenResolver(bearerTokenResolver)
+                        .jwt(jwtConfigurer -> jwtConfigurer.jwtAuthenticationConverter(jwtAuthenticationConverter())));
 
         return http.build();
     }
