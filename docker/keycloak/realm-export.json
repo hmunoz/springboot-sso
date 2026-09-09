@@ -27,7 +27,7 @@
   "oauth2DevicePollingInterval": 5,
   "enabled": true,
   "sslRequired": "external",
-  "registrationAllowed": false,
+  "registrationAllowed": true,
   "registrationEmailAsUsername": false,
   "rememberMe": false,
   "verifyEmail": false,
@@ -524,6 +524,9 @@
       "realmRoles": [],
       "clientRoles": {}
     }
+  ],
+  "defaultGroups": [
+    "/videoclub-default/cliente"
   ],
   "defaultRole": {
     "id": "a5d614fe-3075-4afd-91ea-591c3af166ac",
@@ -2704,7 +2707,7 @@
       "name": "Configure OTP",
       "providerId": "CONFIGURE_TOTP",
       "enabled": true,
-      "defaultAction": false,
+      "defaultAction": true,
       "priority": 10,
       "config": {}
     },
