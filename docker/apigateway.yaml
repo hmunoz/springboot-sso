@@ -7,5 +7,5 @@ services:
     ports:
       - "9500:9500"
     volumes:
-      - ./gateway.yml:/workspace/config/application.yml:ro
+      - ./gateway/gateway.yml:/workspace/config/application.yml:ro
 
