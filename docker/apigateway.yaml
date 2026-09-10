@@ -2,8 +2,8 @@ name: videoclub
 services:
   gateway:
     image: registry.gitlab.com/public-unrn/apigateway:1.0
-    #extra_hosts:
-    #  - "host.docker.internal:${HOST_IP}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "9500:9500"
     environment:
