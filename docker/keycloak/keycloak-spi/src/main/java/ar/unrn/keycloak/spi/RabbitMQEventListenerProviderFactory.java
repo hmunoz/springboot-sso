@@ -24,7 +24,8 @@ import java.util.logging.Logger;
  *   <li>RABBITMQ_USER (default: guest)</li>
  *   <li>RABBITMQ_PASS (default: guest)</li>
  *   <li>RABBITMQ_VHOST (default: /)</li>
- *   <li>RABBITMQ_EXCHANGE (default: amq.topic)</li>
+ *   <li>RABBITMQ_EXCHANGE (default: keycloak.events) — declared as a durable topic
+ *       exchange on startup, so it does not need to pre-exist</li>
  * </ul>
  */
 public class RabbitMQEventListenerProviderFactory implements EventListenerProviderFactory {
@@ -48,7 +49,7 @@ public class RabbitMQEventListenerProviderFactory implements EventListenerProvid
         String user = env("RABBITMQ_USER", "guest");
         String pass = env("RABBITMQ_PASS", "guest");
         String vhost = env("RABBITMQ_VHOST", "/");
-        exchange = env("RABBITMQ_EXCHANGE", "amq.topic");
+        exchange = env("RABBITMQ_EXCHANGE", "keycloak.events");
 
         try {
             ConnectionFactory factory = new ConnectionFactory();
@@ -62,7 +63,16 @@ public class RabbitMQEventListenerProviderFactory implements EventListenerProvid
             connection = factory.newConnection("keycloak-spi");
             channel = connection.createChannel();
 
-            LOG.info(String.format("RabbitMQ SPI connected to %s:%d (exchange: %s)", host, port, exchange));
+            // The producer declares what it needs to publish to. Without this, pointing
+            // RABBITMQ_EXCHANGE at anything other than the built-in amq.topic makes the
+            // first publish fail with a 404 and close this long-lived channel, after which
+            // every event is silently dropped until Keycloak is restarted.
+            // Declaring is idempotent, so re-declaring amq.topic with matching properties
+            // is a no-op.
+            channel.exchangeDeclare(exchange, "topic", true);
+
+            LOG.info(String.format("RabbitMQ SPI connected to %s:%d (exchange: %s, declared as durable topic)",
+                    host, port, exchange));
         } catch (Exception e) {
             LOG.log(Level.SEVERE, String.format("Failed to connect to RabbitMQ at %s:%d — events will not be published", host, port), e);
         }

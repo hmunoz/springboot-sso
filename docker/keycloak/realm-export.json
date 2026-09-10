@@ -357,6 +357,15 @@
           "clientRole": true,
           "containerId": "bd838c70-f569-4a8b-ad84-ae99f426038d",
           "attributes": {}
+        },
+        {
+          "id": "a4316114-9620-41d1-a678-41b5a5363fa9",
+          "name": "socio-permission-read",
+          "description": "Read videoclub member (Socio) data",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "bd838c70-f569-4a8b-ad84-ae99f426038d",
+          "attributes": {}
         }
       ],
       "security-admin-console": [],
@@ -484,7 +493,8 @@
               "movie-permission-update",
               "movie-permission-delete",
               "user-permission-read",
-              "user-permission-create"
+              "user-permission-create",
+              "socio-permission-read"
             ]
           }
         },
@@ -2115,7 +2125,10 @@
     ]
   },
   "internationalizationEnabled": true,
-  "supportedLocales": [ "es", "en" ],
+  "supportedLocales": [
+    "es",
+    "en"
+  ],
   "defaultLocale": "es",
   "authenticationFlows": [
     {
