@@ -62,7 +62,16 @@ public class RabbitMQEventListenerProviderFactory implements EventListenerProvid
             connection = factory.newConnection("keycloak-spi");
             channel = connection.createChannel();
 
-            LOG.info(String.format("RabbitMQ SPI connected to %s:%d (exchange: %s)", host, port, exchange));
+            // The producer declares what it needs to publish to. Without this, pointing
+            // RABBITMQ_EXCHANGE at anything other than the built-in amq.topic makes the
+            // first publish fail with a 404 and close this long-lived channel, after which
+            // every event is silently dropped until Keycloak is restarted.
+            // Declaring is idempotent, so re-declaring amq.topic with matching properties
+            // is a no-op.
+            channel.exchangeDeclare(exchange, "topic", true);
+
+            LOG.info(String.format("RabbitMQ SPI connected to %s:%d (exchange: %s, declared as durable topic)",
+                    host, port, exchange));
         } catch (Exception e) {
             LOG.log(Level.SEVERE, String.format("Failed to connect to RabbitMQ at %s:%d — events will not be published", host, port), e);
         }

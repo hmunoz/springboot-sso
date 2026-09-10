@@ -19,6 +19,23 @@ spring:
     username: ${RABBITMQ_USER:rabbitmq}
     password: ${RABBITMQ_PASS:rabbitmq}
     virtual-host: ${RABBITMQ_VHOST:/}
+    # Without publisher confirms a failed publish raises nothing and the domain event
+    # is lost silently. MessagePublisher waits on these confirmations.
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    listener:
+      simple:
+        # One consumer keeps queue ordering, which the CREATE -> UPDATE -> DELETE
+        # sequence relies on.
+        concurrency: 1
+        # Retry transient failures (a database restart, a brief network hiccup) before
+        # the message is treated as poisoned and dead-lettered.
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+          multiplier: 2
+          max-interval: 10s
   datasource:
     url: ${JDBC_DATABASE_URL:jdbc:postgresql://localhost:5432/video}
     username: ${JDBC_DATABASE_USERNAME:postgres}
@@ -63,6 +80,11 @@ springdoc:
       client-id: ${KEYCLOAK_CLIENT_ID:videoclub-frontend}
       realm: ${KEYCLOAK_REALM:videoclub}
       use-pkce-with-authorization-code-grant: true
+
+videoclub:
+  rabbitmq:
+    exchange: ${VIDEOCLUB_EXCHANGE:videoclub.events}
+    socio-queue: ${VIDEOCLUB_SOCIO_QUEUE:socio.events.queue}
 
 keycloak:
   admin:
