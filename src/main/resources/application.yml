@@ -1,12 +1,24 @@
 spring:
+  application:
+    name: video
+  config:
+    import:
+      - optional:file:.env[.properties]
+
   #Seguridad
   security:
     oauth2:
       resource-server:
         jwt:
-          issuer-uri: http://localhost:9090/realms/videoclub
-          jwk-set-uri: http://localhost:9090/realms/videoclub/protocol/openid-connect/certs
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:${KEYCLOAK_URL:http://localhost:9091}/realms/${KEYCLOAK_REALM:videoclub}}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:${KEYCLOAK_URL:http://localhost:9091}/realms/${KEYCLOAK_REALM:videoclub}/protocol/openid-connect/certs}
   #Base de datos
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:rabbitmq}
+    password: ${RABBITMQ_PASS:rabbitmq}
+    virtual-host: ${RABBITMQ_VHOST:/}
   datasource:
     url: ${JDBC_DATABASE_URL:jdbc:postgresql://localhost:5432/video}
     username: ${JDBC_DATABASE_USERNAME:postgres}
@@ -31,21 +43,16 @@ spring:
       file: ./docker/services.yaml
       lifecycle-management: start_only
       enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
 
-error:
-  handling:
-    http-status-in-json-response: true
-    exception-logging: NO_LOGGING
-    full-stacktrace-http-statuses: 5xx
-    log-levels:
-      5xx: ERROR
-    codes:
-      TestNameUnique: TEST_NAME_UNIQUE
 # swagger y keycloak integration
 # http://localhost:8080/swagger-ui/index.html
 springdoc:
   oauth2:
-    authorization-url: "http://localhost:9090/realms/videoclub/protocol/openid-connect/auth"
+    authorization-url: "${KEYCLOAK_AUTH_URL:${KEYCLOAK_URL:http://localhost:9091}/realms/${KEYCLOAK_REALM:videoclub}/protocol/openid-connect/auth}"
+    token-url: "${KEYCLOAK_TOKEN_URL:${KEYCLOAK_URL:http://localhost:9091}/realms/${KEYCLOAK_REALM:videoclub}/protocol/openid-connect/token}"
   api-docs:
     enabled: true
     path: "/api-docs"
@@ -53,8 +60,22 @@ springdoc:
     path: "/swagger-ui.html"
     url: "/api-docs"
     oauth:
-      client-id: web
-      realm: videoclub
+      client-id: ${KEYCLOAK_CLIENT_ID:videoclub-frontend}
+      realm: ${KEYCLOAK_REALM:videoclub}
+      use-pkce-with-authorization-code-grant: true
+
+keycloak:
+  admin:
+    url: ${KEYCLOAK_URL:http://localhost:9091}
+    realm: ${KEYCLOAK_REALM:videoclub}
+    client-id: ${KEYCLOAK_BACKEND_CLIENT_ID:videoclub-backend}
+    client-secret: ${KEYCLOAK_BACKEND_CLIENT_SECRET:dstNSsANvqlaGfZCJa1mcYzP1EBAYP4N}
+  rabbitmq:
+    exchange: ${RABBITMQ_EXCHANGE:amq.topic}
+    queue: ${KEYCLOAK_RABBITMQ_QUEUE:keycloak-events}
+    routing-keys:
+      - "keycloak.user.#"
+      - "keycloak.admin.USER.*"
 
 server:
   port: ${SERVER_PORT:8080}

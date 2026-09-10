@@ -1,28 +1,30 @@
 name: videoclub
 services:
   keycloak:
-    image: quay.io/keycloak/keycloak:25.0.2
+    image: quay.io/keycloak/keycloak:26.7
     container_name: video-keycloak
     hostname: video-keycloak
     environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       DB_VENDOR: h2
       KC_FEATURES: scripts
       KC_HEALTH_ENABLED: true
       KC_HTTP_MANAGEMENT_PORT: 9990
-      # rabbit
-      KK_TO_RMQ_URL: rabbit
-      KK_TO_RMQ_VHOST: ${RABBITMQ_DEFAULT_VHOST}
-      KK_TO_RMQ_EXCHANGE: ${KK_TO_RMQ_EXCHANGE}
-      KK_TO_RMQ_USERNAME: ${RABBITMQ_DEFAULT_USER}
-      KK_TO_RMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS}
+      # RabbitMQ — consumed by the custom SPI
+      RABBITMQ_HOST: rabbit
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_VHOST: ${RABBITMQ_DEFAULT_VHOST}
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE}
     ports:
-      - 9090:8080
-    # json export tiene realm videoclub, client test-api y web, usuario, grupos y roles
+      - "${KEYCLOAK_PORT:-9090}:8080"
+    # json export tiene realm videoclub, client videoclub-backend y videoclub-frontend, usuario, grupos y roles
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
-      - ./keycloak/keycloak-to-rabbit-3.0.5.jar:/opt/keycloak/providers/keycloak-to-rabbit-3.0.5.jar
+      - ./keycloak/keycloak-spi/target/keycloak-spi-1.0.0.jar:/opt/keycloak/providers/keycloak-spi.jar
+      - ./keycloak/themes:/opt/keycloak/themes
     command: start-dev --import-realm
     healthcheck:
       test: [ "CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9990;echo -e 'GET /health/ready HTTP/1.1\r\nhost: http://localhost\r\nConnection: close\r\n\r\n' >&3;if [ $? -eq 0 ]; then echo 'Healthcheck Successful';exit 0;else echo 'Healthcheck Failed';exit 1;fi;" ]

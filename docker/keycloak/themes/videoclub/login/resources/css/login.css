@@ -1,0 +1,332 @@
+/* ==========================================================================
+   VideoClub SSO Theme - Keycloak 26 Login & Registration Styling
+   Clean, modern styling matching React frontend aesthetic
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Design Variables
+   -------------------------------------------------------------------------- */
+:root {
+  --vc-bg: #f7fafc;
+  --vc-card-bg: #ffffff;
+  --vc-header-bg: #1a202c;
+  --vc-header-border: #2d3748;
+  --vc-text-primary: #1a202c;
+  --vc-text-secondary: #4a5568;
+  --vc-text-muted: #718096;
+  --vc-border: #e2e8f0;
+  --vc-input-border: #cbd5e0;
+  --vc-primary: #3182ce;
+  --vc-primary-hover: #2b6cb0;
+  --vc-primary-active: #2c5282;
+  --vc-danger: #e53e3e;
+  --vc-danger-bg: #fff5f5;
+}
+
+/* --------------------------------------------------------------------------
+   Global Layout & Background
+   -------------------------------------------------------------------------- */
+html,
+body,
+body#keycloak-bg,
+.login-pf body {
+  background-color: var(--vc-bg) !important;
+  background-image: none !important;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif !important;
+  color: var(--vc-text-primary) !important;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Top Brand Badge (📼 VideoClub SSO)
+   -------------------------------------------------------------------------- */
+#kc-header,
+.pf-v5-c-login__header {
+  margin-top: 2rem !important;
+  margin-bottom: 1.5rem !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+#kc-header-wrapper,
+.login-pf-brand {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background-color: var(--vc-header-bg) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--vc-header-border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  padding: 0.65rem 1.4rem !important;
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.025em !important;
+  text-transform: none !important;
+  line-height: 1.4 !important;
+}
+
+#kc-header-wrapper::before {
+  content: "📼\00a0\00a0";
+  font-size: 1.35rem;
+}
+
+/* --------------------------------------------------------------------------
+   Container & Card Sizing
+   -------------------------------------------------------------------------- */
+.pf-v5-c-login__container {
+  grid-template-columns: 30rem !important;
+  max-width: 30rem !important;
+  width: 100% !important;
+}
+
+@media (max-width: 540px) {
+  .pf-v5-c-login__container {
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+    padding: 0 1rem !important;
+  }
+}
+
+.pf-v5-c-login__main,
+.card-pf {
+  background-color: var(--vc-card-bg) !important;
+  border: 1px solid var(--vc-border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
+  padding: 2rem !important;
+}
+
+/* --------------------------------------------------------------------------
+   Card Header & Title
+   -------------------------------------------------------------------------- */
+.pf-v5-c-login__main-header {
+  border-top: 4px solid var(--vc-header-bg) !important;
+  padding: 0.75rem 0 1.25rem 0 !important;
+  border-bottom: 1px solid #edf2f7 !important;
+  margin-bottom: 1.5rem !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 1rem !important;
+}
+
+#kc-page-title,
+.login-pf-header h1 {
+  color: var(--vc-text-primary) !important;
+  font-size: 1.4rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+  margin: 0 !important;
+  white-space: nowrap !important;
+}
+
+.pf-v5-c-login__main-header-utilities {
+  flex-shrink: 0 !important;
+}
+
+.pf-v5-c-login__main-header-utilities .pf-v5-c-form-control {
+  width: auto !important;
+  min-width: 85px !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.pf-v5-c-login__main-header-utilities select,
+#login-select-toggle {
+  font-size: 0.85rem !important;
+  padding: 0.3rem 0.6rem !important;
+  cursor: pointer !important;
+  background-color: #ffffff !important;
+  color: var(--vc-text-primary) !important;
+  border: 1px solid var(--vc-input-border) !important;
+  border-radius: 6px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Labels & Form Groups
+   -------------------------------------------------------------------------- */
+.pf-v5-c-form__group {
+  margin-bottom: 1.2rem !important;
+}
+
+.pf-v5-c-form__label-text {
+  font-weight: 600 !important;
+  color: var(--vc-text-secondary) !important;
+  font-size: 0.9rem !important;
+}
+
+.pf-v5-c-form__label-required {
+  color: var(--vc-danger) !important;
+  font-weight: 700 !important;
+  margin-left: 0.25rem !important;
+}
+
+/* --------------------------------------------------------------------------
+   Inputs & Controls (Clean 4-sided borders, White fill, No Dark Mode artifact)
+   -------------------------------------------------------------------------- */
+span.pf-v5-c-form-control {
+  border: 1px solid var(--vc-input-border) !important;
+  border-radius: 6px !important;
+  background-color: #ffffff !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  display: block !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+/* Disable PatternFly pseudo-borders that cause underline & dark fills */
+span.pf-v5-c-form-control::before,
+span.pf-v5-c-form-control::after {
+  display: none !important;
+}
+
+span.pf-v5-c-form-control:focus-within {
+  border-color: var(--vc-primary) !important;
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.25) !important;
+}
+
+span.pf-v5-c-form-control input,
+.pf-v5-c-form-control input {
+  border: none !important;
+  outline: none !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  font-size: 0.95rem !important;
+  padding: 0.55rem 0.85rem !important;
+  color: var(--vc-text-primary) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Password Eye Button Container */
+.pf-v5-c-input-group {
+  width: 100% !important;
+  display: flex !important;
+  align-items: stretch !important;
+}
+
+.pf-v5-c-input-group .pf-v5-c-input-group__item.pf-m-fill {
+  flex: 1 1 auto !important;
+}
+
+.pf-v5-c-input-group .pf-v5-c-input-group__item.pf-m-fill span.pf-v5-c-form-control {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control {
+  border: 1px solid var(--vc-input-border) !important;
+  border-left: none !important;
+  border-top-right-radius: 6px !important;
+  border-bottom-right-radius: 6px !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  background-color: #f7fafc !important;
+  color: var(--vc-text-muted) !important;
+  padding: 0 0.85rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+}
+
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control:hover {
+  background-color: #edf2f7 !important;
+  color: var(--vc-text-primary) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Buttons (Primary Action)
+   -------------------------------------------------------------------------- */
+.pf-v5-c-button.pf-m-primary,
+#kc-login,
+#kc-form-buttons input[type="submit"],
+input[type="submit"].pf-v5-c-button {
+  background-color: var(--vc-primary) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  font-size: 0.95rem !important;
+  padding: 0.65rem 1.25rem !important;
+  cursor: pointer !important;
+  width: 100% !important;
+  display: block !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  transition: background-color 0.15s ease !important;
+  text-align: center !important;
+  margin-top: 0.75rem !important;
+}
+
+.pf-v5-c-button.pf-m-primary:hover,
+#kc-login:hover,
+#kc-form-buttons input[type="submit"]:hover,
+input[type="submit"].pf-v5-c-button:hover {
+  background-color: var(--vc-primary-hover) !important;
+}
+
+.pf-v5-c-button.pf-m-primary:active,
+#kc-login:active,
+#kc-form-buttons input[type="submit"]:active,
+input[type="submit"].pf-v5-c-button:active {
+  background-color: var(--vc-primary-active) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Footer & Navigation Links
+   -------------------------------------------------------------------------- */
+.pf-v5-c-login__main-footer {
+  border-top: 1px solid #edf2f7 !important;
+  margin-top: 1.5rem !important;
+  padding-top: 1rem !important;
+  text-align: center !important;
+  font-size: 0.9rem !important;
+  color: var(--vc-text-muted) !important;
+}
+
+.pf-v5-c-login__main-footer a,
+#kc-registration a,
+#kc-form-options a {
+  color: var(--vc-primary) !important;
+  font-weight: 600 !important;
+  text-decoration: none !important;
+}
+
+.pf-v5-c-login__main-footer a:hover,
+#kc-registration a:hover,
+#kc-form-options a:hover {
+  color: var(--vc-primary-hover) !important;
+  text-decoration: underline !important;
+}
+
+.pf-v5-c-login__main-footer-band,
+#kc-form-options {
+  margin-top: 1rem !important;
+  text-align: center !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+/* --------------------------------------------------------------------------
+   Alerts & Notifications
+   -------------------------------------------------------------------------- */
+.pf-v5-c-alert {
+  border-radius: 6px !important;
+  margin-bottom: 1.25rem !important;
+  font-size: 0.9rem !important;
+}
+
+.pf-v5-c-alert.pf-m-danger {
+  background-color: var(--vc-danger-bg) !important;
+  border-left: 4px solid var(--vc-danger) !important;
+  color: #c53030 !important;
+}
+
+.pf-v5-c-helper-text__item.pf-m-error {
+  color: var(--vc-danger) !important;
+  font-size: 0.85rem !important;
+  margin-top: 0.25rem !important;
+}
