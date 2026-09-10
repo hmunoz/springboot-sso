@@ -23,7 +23,7 @@ public class RabbitMQConfig {
 
     // --- Infrastructure topology: events published by the Keycloak SPI ---
 
-    @Value("${keycloak.rabbitmq.exchange:amq.topic}")
+    @Value("${keycloak.rabbitmq.exchange:keycloak.events}")
     private String exchangeName;
 
     @Value("${keycloak.rabbitmq.queue:keycloak-events}")
@@ -43,7 +43,7 @@ public class RabbitMQConfig {
 
     @Bean
     public TopicExchange keycloakExchange() {
-        // amq.topic is a pre-defined durable topic exchange in RabbitMQ
+        // keycloak.events is a durable topic exchange declared by the SPI or on Spring startup
         return new TopicExchange(exchangeName, true, false);
     }
 

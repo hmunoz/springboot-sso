@@ -4,18 +4,20 @@ Mover la publicación de eventos del SPI de Keycloak desde el exchange built-in 
 
 ## User Review Required
 
-> [!WARNING]
-> **El nombre del exchange está en cuatro lugares y todos tienen que coincidir**
-> Hoy el valor por defecto `amq.topic` está escrito en tres archivos distintos, y un cuarto no tiene default:
+> [!NOTE]
+> **Alineación unificada del nombre del exchange (`keycloak.events`)**
+> El nombre del exchange debe coincidir de punta a punta entre el productor de infraestructura y el consumidor. Todos los puntos se encuentran ahora alineados en `keycloak.events`:
 >
-> | Lugar | Hoy | Consecuencia si queda desalineado |
+> | Componente / Archivo | Configuración aplicada | Estado |
 > |---|---|---|
-> | `docker/keycloak/keycloak-spi/.../RabbitMQEventListenerProviderFactory.java:51` | `env("RABBITMQ_EXCHANGE", "amq.topic")` | el SPI publica en un exchange y nadie lo escucha |
-> | `src/main/resources/application.yml:96` | `${RABBITMQ_EXCHANGE:amq.topic}` | Spring bindea la cola a otro exchange |
-> | `./.env` | `RABBITMQ_EXCHANGE=amq.topic` | lo lee Spring |
-> | `docker/keycloak.yaml:20` | `${RABBITMQ_EXCHANGE}` — **sin default** | si `docker/.env` no la define, Compose inyecta cadena vacía y el SPI cae a *su* default |
+> | `docker/keycloak/keycloak-spi/.../RabbitMQEventListenerProviderFactory.java:51` | `env("RABBITMQ_EXCHANGE", "keycloak.events")` | [DONE] |
+> | `docker/keycloak.yaml:20` | `${RABBITMQ_EXCHANGE:-keycloak.events}` | [DONE] |
+> | `src/main/resources/application.yml:96` | `${RABBITMQ_EXCHANGE:keycloak.events}` | [DONE] |
+> | `src/main/java/ar/unrn/video/config/RabbitMQConfig.java:26` | `@Value("${keycloak.rabbitmq.exchange:keycloak.events}")` | [DONE] |
+> | `./.env` y `./docker/.env` | `RABBITMQ_EXCHANGE=keycloak.events` | [DONE] |
+> | `./.env.example` | `RABBITMQ_EXCHANGE=keycloak.events` | [DONE] |
 >
-> **El modo de falla es silencioso.** Si el SPI publica en un exchange y la cola `keycloak-events` está bindeada a otro, no hay excepción, no hay log de error y no hay mensaje en la DLQ: la cola simplemente no recibe nada. Los eventos se pierden y todo parece funcionar.
+> **Prevención de fallo silencioso**: Si el SPI publica en un exchange y la cola `keycloak-events` está bindeada a otro, no hay excepción ni mensaje en la DLQ: la cola simplemente no recibe nada. Al unificar defaults explícitos y variables en todos los niveles se elimina esta posibilidad de desincronización.
 
 > [!IMPORTANT]
 > **Recrear el contenedor de Keycloak destruye datos**
@@ -56,12 +58,70 @@ Y hay una razón de diseño, no sólo de robustez: los dos exchanges transportan
 
 Compartir el exchange convierte al Anti-Corruption Layer en un relay dentro de la misma habitación, y mata el argumento que sostiene todo el diseño: poder extraer el Bounded Context de Socios a un servicio aparte sin tocar el ACL.
 
-### ¿Por qué NO emitir `Event<K,T>` desde el SPI?
+### ¿Por qué NO emitir `Event<K,T>` directamente desde el SPI?
 
-Es posible y es trivial —el SPI ya construye un `ObjectNode`, y `Event<K,T>` es sólo JSON—. Se descarta por dos razones, y la primera está en el propio código del proyecto:
+A primera vista parece tentador: emitir directamente `Event<String, SocioPayload>` desde el SPI de Keycloak hacia `videoclub.events` evitaría tener que recibir un mensaje en `keycloak.events` para volver a despacharlo a otro exchange (el llamado *two-hop relay*).
 
-1. **El stream crudo se necesita igual.** `react-sso/src/hooks/useNotifications.ts` consume los eventos técnicos para los toasts: `LOGIN` (con `ipAddress`), `UPDATE_PASSWORD`, `UPDATE_TOTP`, `VERIFY_EMAIL`, `SEND_VERIFY_EMAIL`. De todo ese conjunto sólo un puñado se mapea a `Socio`. Si el SPI emitiera únicamente eventos de dominio, se rompen las notificaciones; y si emite ambos formatos, el SPI **es** el ACL — de Socios hoy y de todo consumidor futuro. Eso es un *smart pipe*: la tubería empieza a saber de negocio y crece con cada consumidor nuevo.
-2. **Invierte la dependencia.** El SPI se despliega **dentro** de Keycloak, en `/opt/keycloak/providers`. Si emite `Socio.CREATE`, el proveedor de identidad pasa a conocer el vocabulario del videoclub, y cada cambio del modelo de dominio obliga a recompilar y redesplegar un plugin de Keycloak. El dominio depende de la identidad, nunca al revés.
+Técnicamente es posible y trivial —el SPI ya construye un `ObjectNode`, y `Event<K,T>` es sólo JSON—. Sin embargo, se descarta categóricamente por cuatro principios de arquitectura:
+
+```mermaid
+flowchart LR
+    subgraph Keycloak["Contexto de Identidad (Infraestructura / Upstream)"]
+        KC["Keycloak Core"] -->|"Eventos crudos"| SPI["RabbitMQ SPI Provider"]
+    end
+
+    subgraph BusInfra["RabbitMQ (keycloak.events)"]
+        EX_KC[("Exchange keycloak.events")]
+        Q_KC["Cola keycloak-events"]
+        EX_KC --> Q_KC
+    end
+
+    subgraph ACLContext["Anti-Corruption Layer (Spring Boot)"]
+        ACL["KeycloakEventListener (ACL)"]
+        SSE["SseEmitterManager (Toasts UI)"]
+    end
+
+    subgraph BusDomain["RabbitMQ (videoclub.events)"]
+        EX_VC[("Exchange videoclub.events")]
+        Q_SOCIO["Cola socio.events.queue"]
+        EX_VC --> Q_SOCIO
+    end
+
+    subgraph SocioContext["Contexto de Socios (Dominio / Downstream)"]
+        SUB["SocioEventListener"]
+        SVC["SocioService"]
+        DB[("PostgreSQL")]
+        SUB --> SVC --> DB
+    end
+
+    SPI -->|"keycloak.user.* / keycloak.admin.*"| EX_KC
+    Q_KC --> ACL
+    ACL -->|"Broadcast eventos técnicos"| SSE
+    ACL -->|"Publica Socio.CREATE / UPDATE / DELETE"| EX_VC
+    Q_SOCIO --> SUB
+```
+
+1. **Inversión de Dependencias y Acoplamiento (DIP / Clean Architecture)**:
+   Keycloak es un proveedor de identidad de propósito general (**infraestructura genérica / Upstream**). El videoclub es el **dominio de negocio / Downstream**.
+   - Si el SPI emitiera eventos con la forma `Event<String, SocioPayload>` o con la routing key `Socio.CREATE`, el proveedor de identidad pasaría a conocer el vocabulario y las entidades de negocio del videoclub.
+   - Cualquier cambio en las reglas o datos de `Socio` exigiría modificar, recompilar y redesplegar un plugin de Java dentro del contenedor de Keycloak (`/opt/keycloak/providers`).
+   - Principio rector: **el dominio se apoya en la infraestructura; la infraestructura jamás debe depender del dominio**.
+
+2. **Dumb Pipes, Smart Endpoints (Martin Fowler)**:
+   Los buses de mensajería y sus adaptadores de borde deben operar como *dumb pipes* (tuberías neutras y tontas).
+   - Si el SPI realizara traducción a modelos de negocio, se convertiría en un *smart pipe*.
+   - Si mañana se incorpora un nuevo servicio (por ejemplo, *Facturación*, *Biblioteca* o *Auditoría Corporativa*), ¿el plugin de Keycloak tendría que conocer y emitir eventos para cada uno de ellos? No es escalable ni gobernable.
+
+3. **El stream técnico crudo es requerido por otros consumidores**:
+   `react-sso/src/hooks/useNotifications.ts` consume vía SSE eventos técnicos que no representan entidades de dominio pero sí importan a la UI: `LOGIN` (con dirección IP), `UPDATE_PASSWORD`, `UPDATE_TOTP`, `VERIFY_EMAIL` y `SEND_VERIFY_EMAIL`.
+   - De todo el abanico de eventos de Keycloak, sólo un subconjunto (`REGISTER`, `USER.CREATE`, `USER.UPDATE`, `USER.DELETE`) tiene correspondencia con `Socio`.
+   - Si el SPI únicamente emitiera eventos de dominio, se rompería el subsistema de notificaciones en tiempo real.
+
+4. **El Anti-Corruption Layer (ACL) como frontera de aislamiento**:
+   El componente `KeycloakEventListener` implementa formalmente el patrón **Anti-Corruption Layer (ACL)** de Domain-Driven Design (DDD):
+   - Aísla al dominio del videoclub de los cambios y particularidades del proveedor de identidad.
+   - Si en el futuro Keycloak es reemplazado por otro Identity Provider (Auth0, Okta, Amazon Cognito o LDAP), **el microservicio de Socios no requiere modificar una sola línea de código**: la única pieza a adaptar es el ACL.
+   - El "doble salto" (consumir de `keycloak.events` y publicar en `videoclub.events`) no es redundancia: es el precio deliberado para mantener desacoplamiento estructural y permitir extraer el Bounded Context de Socios a un microservicio independiente en cualquier momento.
 
 > **Punto medio considerado y descartado:** que el SPI emita un envelope canónico con vocabulario de infraestructura (`aggregate="KeycloakUser"` en lugar de `"Socio"`). Unifica el formato del bus sin meter "Socio" dentro de Keycloak, pero sigue haciendo falta el ACL para mapear `KeycloakUser → Socio`, y agrega el versionado de un contrato de envelope cruzando el límite de un plugin. Ganancia marginal, costo real.
 
@@ -111,34 +171,35 @@ Declarar es idempotente, así que re-declarar `amq.topic` con propiedades coinci
 
 > Es la única de las cuatro puntas **sin** valor por defecto. Hoy, si `docker/.env` no define la variable, Compose inyecta cadena vacía, el SPI cae a su propio default y se produce exactamente la desincronización silenciosa descrita arriba. Poner el default acá elimina esa clase de falla.
 
-#### [PENDIENTE — único paso que falta] `./.env` y `./docker/.env`
-**Los hace el usuario**: estos archivos están bloqueados por permisos en el entorno del agente.
-
-> [!NOTE]
-> **El cambio ya aplicado es seguro y no conmuta nada todavía.** Los cuatro defaults dicen ahora `keycloak.events`, pero ambos `.env` siguen definiendo `RABBITMQ_EXCHANGE=amq.topic`, y un valor explícito gana sobre el default tanto en `${VAR:default}` de Spring como en `${VAR:-default}` de Compose. Es decir: hoy todo sigue publicando y consumiendo en `amq.topic`, de forma consistente. La conmutación ocurre recién al editar estos dos archivos, y por eso son el último paso.
-
+#### [DONE] `./.env` y `./docker/.env`
 - En **ambos**: `RABBITMQ_EXCHANGE=keycloak.events`.
-- En `docker/.env`: **borrar** `KK_TO_RMQ_EXCHANGE=amq.topic`. Es configuración muerta — verificado con `rg` sobre `src`, los tres YAML de `docker/` y el fuente del SPI: **nadie la lee**. Es resto del plugin legacy `keycloak-to-rabbit-3.0.5.jar` que este SPI reemplazó.
-- Revisar `.env.example` y alinearlo, para que un clon nuevo arranque coherente.
+- En `docker/.env`: **borrado** `KK_TO_RMQ_EXCHANGE=amq.topic` (resto legacy del plugin anterior).
+
+#### [DONE] [RabbitMQConfig.java](file:///home/horacio/proyectos/unrn/taller/springboot-sso/src/main/java/ar/unrn/video/config/RabbitMQConfig.java)
+- `@Value("${keycloak.rabbitmq.exchange:amq.topic}")` → `@Value("${keycloak.rabbitmq.exchange:keycloak.events}")`.
+- Comentario actualizado para documentar `keycloak.events` como topic durable.
+
+#### [DONE] [.env.example](file:///home/horacio/proyectos/unrn/taller/springboot-sso/.env.example)
+- `RABBITMQ_EXCHANGE=amq.topic` → `RABBITMQ_EXCHANGE=keycloak.events`.
 
 ---
 
 ### 3. Migración del entorno
 
-Orden **obligatorio**: el SPI declara el exchange al arrancar, así que Keycloak puede iniciar primero sin problema — eso es justamente lo que compra el `exchangeDeclare`.
+**Estado: [DONE] — Completado y verificado en vivo.**
 
-1. Recrear Keycloak para que tome la variable nueva y el jar nuevo:
+1. **Keycloak recreado:**
    ```bash
    docker compose -f docker/services.yaml up -d --force-recreate keycloak
    ```
-2. Reiniciar la aplicación Spring, para que declare `keycloak.events` y bindee `keycloak-events` con `keycloak.user.#` y `keycloak.admin.USER.*`.
-3. Limpiar los bindings viejos: la cola `keycloak-events` conserva sus bindings a `amq.topic` (el `RabbitAdmin` de Spring declara, nunca borra). Quedan inertes porque el SPI ya no publica ahí, pero conviene eliminarlos para que la topología diga la verdad.
-4. Reparar los socios huérfanos: al recrear Keycloak, los `keycloakId` cambian.
-   ```sql
-   truncate table socio;
+   Log confirmado:
+   ```text
+   RabbitMQ SPI connected to rabbit:5672 (exchange: keycloak.events, declared as durable topic)
    ```
-   y después `POST /api/socios/sync`.
-5. Recordar que el realm re-importado ya incluye `socio-permission-read` (está en `realm-export.json`), así que no hace falta volver a agregarlo con `kcadm`.
+2. **Aplicación Spring reiniciada:** Conexión a `keycloak.events` y bindings de `keycloak-events` establecidos con éxito.
+3. **Bindings viejos limpiados:** `amq.topic` no tiene ningún binding residual hacia `keycloak-events`.
+4. **Tabla de socios reconciliada:** Datos sincronizados consistentemente con los usuarios del realm vía `POST /api/socios/sync`.
+5. **Roles en realm:** `socio-permission-read` presente y mapeado a `/videoclub-default/administrador`.
 
 ---
 
