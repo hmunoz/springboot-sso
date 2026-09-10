@@ -46,23 +46,7 @@ public class RabbitMQConfig {
     @Bean
     public org.springframework.amqp.support.converter.MessageConverter messageConverter(tools.jackson.databind.json.JsonMapper jsonMapper) {
         org.springframework.amqp.support.converter.JacksonJsonMessageConverter converter =
-                new org.springframework.amqp.support.converter.JacksonJsonMessageConverter(jsonMapper) {
-                    @Override
-                    public Object fromMessage(org.springframework.amqp.core.Message message, Object conversionHint) {
-                        if (message.getMessageProperties() != null) {
-                            message.getMessageProperties().setContentType("application/json");
-                        }
-                        return super.fromMessage(message, conversionHint);
-                    }
-
-                    @Override
-                    public Object fromMessage(org.springframework.amqp.core.Message message) {
-                        if (message.getMessageProperties() != null) {
-                            message.getMessageProperties().setContentType("application/json");
-                        }
-                        return super.fromMessage(message);
-                    }
-                };
+                new org.springframework.amqp.support.converter.JacksonJsonMessageConverter(jsonMapper);
         converter.setAlwaysConvertToInferredType(true);
         return converter;
     }

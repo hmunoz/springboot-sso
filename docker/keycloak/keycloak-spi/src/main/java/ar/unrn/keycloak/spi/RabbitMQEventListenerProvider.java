@@ -2,6 +2,7 @@ package ar.unrn.keycloak.spi;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.MessageProperties;
 import org.keycloak.events.admin.AdminEvent;
@@ -34,6 +35,11 @@ public class RabbitMQEventListenerProvider implements EventListenerProvider {
 
     private static final Logger LOG = Logger.getLogger(RabbitMQEventListenerProvider.class.getName());
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final AMQP.BasicProperties MESSAGE_PROPERTIES_JSON = new AMQP.BasicProperties.Builder()
+            .contentType("application/json")
+            .contentEncoding(StandardCharsets.UTF_8.name())
+            .deliveryMode(2)
+            .build();
 
     private final Channel channel;
     private final String exchange;
@@ -149,7 +155,7 @@ public class RabbitMQEventListenerProvider implements EventListenerProvider {
         }
 
         byte[] body = MAPPER.writeValueAsString(payload).getBytes(StandardCharsets.UTF_8);
-        channel.basicPublish(exchange, routingKey, MessageProperties.PERSISTENT_TEXT_PLAIN, body);
+        channel.basicPublish(exchange, routingKey, MESSAGE_PROPERTIES_JSON, body);
 
         LOG.fine(String.format("Published event to exchange '%s' with routing key '%s'", exchange, routingKey));
     }

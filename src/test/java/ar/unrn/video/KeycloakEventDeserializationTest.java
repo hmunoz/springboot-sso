@@ -31,19 +31,11 @@ public class KeycloakEventDeserializationTest {
                 """;
 
         JsonMapper mapper = JsonMapper.builder().build();
-        JacksonJsonMessageConverter converter = new JacksonJsonMessageConverter(mapper) {
-            @Override
-            public Object fromMessage(Message message, Object conversionHint) {
-                if (message.getMessageProperties() != null) {
-                    message.getMessageProperties().setContentType("application/json");
-                }
-                return super.fromMessage(message, conversionHint);
-            }
-        };
+        JacksonJsonMessageConverter converter = new JacksonJsonMessageConverter(mapper);
         converter.setAlwaysConvertToInferredType(true);
 
         MessageProperties props = new MessageProperties();
-        props.setContentType("text/plain");
+        props.setContentType("application/json");
         props.setInferredArgumentType(KeycloakEvent.class);
 
         Message message = new Message(json.getBytes(StandardCharsets.UTF_8), props);
@@ -79,19 +71,11 @@ public class KeycloakEventDeserializationTest {
                 """;
 
         JsonMapper mapper = JsonMapper.builder().build();
-        JacksonJsonMessageConverter converter = new JacksonJsonMessageConverter(mapper) {
-            @Override
-            public Object fromMessage(Message message, Object conversionHint) {
-                if (message.getMessageProperties() != null) {
-                    message.getMessageProperties().setContentType("application/json");
-                }
-                return super.fromMessage(message, conversionHint);
-            }
-        };
+        JacksonJsonMessageConverter converter = new JacksonJsonMessageConverter(mapper);
         converter.setAlwaysConvertToInferredType(true);
 
         MessageProperties props = new MessageProperties();
-        props.setContentType("text/plain");
+        props.setContentType("application/json");
         props.setInferredArgumentType(KeycloakEvent.class);
 
         Message message = new Message(json.getBytes(StandardCharsets.UTF_8), props);
