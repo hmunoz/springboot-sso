@@ -42,4 +42,39 @@ public class RabbitMQConfig {
                 .to(keycloakExchange)
                 .with("keycloak.admin.USER.*");
     }
+
+    @Bean
+    public org.springframework.amqp.support.converter.MessageConverter messageConverter(tools.jackson.databind.json.JsonMapper jsonMapper) {
+        org.springframework.amqp.support.converter.JacksonJsonMessageConverter converter =
+                new org.springframework.amqp.support.converter.JacksonJsonMessageConverter(jsonMapper) {
+                    @Override
+                    public Object fromMessage(org.springframework.amqp.core.Message message, Object conversionHint) {
+                        if (message.getMessageProperties() != null) {
+                            message.getMessageProperties().setContentType("application/json");
+                        }
+                        return super.fromMessage(message, conversionHint);
+                    }
+
+                    @Override
+                    public Object fromMessage(org.springframework.amqp.core.Message message) {
+                        if (message.getMessageProperties() != null) {
+                            message.getMessageProperties().setContentType("application/json");
+                        }
+                        return super.fromMessage(message);
+                    }
+                };
+        converter.setAlwaysConvertToInferredType(true);
+        return converter;
+    }
+
+    @Bean
+    public org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
+            org.springframework.amqp.rabbit.connection.ConnectionFactory connectionFactory,
+            org.springframework.amqp.support.converter.MessageConverter messageConverter) {
+        org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory factory =
+                new org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory();
+        factory.setConnectionFactory(connectionFactory);
+        factory.setMessageConverter(messageConverter);
+        return factory;
+    }
 }
