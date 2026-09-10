@@ -11,7 +11,7 @@ Implementación de la entidad de negocio `Socio` vinculada a Keycloak (`keycloak
 > [!NOTE]
 > **Topología de Exchanges**:
 > Separamos dos exchanges en RabbitMQ:
-> 1. `amq.topic`: Exchange de infraestructura donde el SPI de Keycloak publica eventos técnicos (`keycloak.user.*`, `keycloak.admin.USER.*`).
+> 1. `keycloak.events`: Exchange de infraestructura donde el SPI de Keycloak publica eventos técnicos (`keycloak.user.*`, `keycloak.admin.USER.*`).
 > 2. `videoclub.events`: Exchange de negocio (Topic) donde se publican eventos canónicos de dominio (`Socio.CREATE`, `Socio.UPDATE`, `Socio.DELETE`). El consumidor de `Socio` solo conoce este exchange, replicando el patrón del proyecto de referencia `amqp-keycloak-rabbit`.
 >
 > El salto por el broker es intencional aunque productor y consumidor vivan hoy en el mismo proceso: es lo que permite extraer el Bounded Context de Socios a un servicio aparte sin tocar el ACL. El costo es entrega *at-least-once* sin transacción compartida, y por eso **toda operación del consumidor debe ser idempotente** (ver §3).
@@ -35,7 +35,7 @@ Implementación de la entidad de negocio `Socio` vinculada a Keycloak (`keycloak
   - *Problema que resuelve*: Evitar inconsistencias cuando un mismo servicio debe guardar en su base de datos relacional y simultáneamente publicar un mensaje en un broker AMQP dentro de una única transacción atómica.
   - *Por qué no aplica acá*: El originador de la identidad es Keycloak (que guarda en su propio datastore y emite vía su SPI). Hay que analizar por separado los dos roles que cumple nuestro backend, porque el patrón se descarta por motivos distintos en cada uno:
     - **Como consumidor** (`SocioEventListener`): sólo escribe en PostgreSQL, **no publica ningún mensaje**. Al haber una única escritura, no existe dual write. La consistencia se garantiza con el ciclo de vida del mensaje en RabbitMQ: **no se envía el ACK al broker hasta que la transacción de PostgreSQL haga `COMMIT` con éxito**. Esto exige que el listener **no capture** las excepciones: si las traga, Spring AMQP ackea y el mensaje se pierde.
-    - **Como productor** (`KeycloakEventListener`, el ACL): consume de `amq.topic` y publica en `videoclub.events`. Es mensaje entra → mensaje sale, **sin ninguna escritura a base de datos**. Tampoco hay dual write que coordinar. Lo que este rol necesita no es un outbox sino **`publisher-confirms` y orden de ACK correcto**: si se ackea el mensaje de Keycloak y después falla el publish al exchange de negocio, el evento se pierde sin dejar rastro (ver §2, `application.yml`).
+    - **Como productor** (`KeycloakEventListener`, el ACL): consume de `keycloak.events` y publica en `videoclub.events`. Es mensaje entra → mensaje sale, **sin ninguna escritura a base de datos**. Tampoco hay dual write que coordinar. Lo que este rol necesita no es un outbox sino **`publisher-confirms` y orden de ACK correcto**: si se ackea el mensaje de Keycloak y después falla el publish al exchange de negocio, el evento se pierde sin dejar rastro (ver §2, `application.yml`).
   - *Cuándo pasaría a ser necesario*: el día que `SocioService` deba **guardar el `Socio` y además publicar su propio evento de dominio** (por ejemplo un `SocioDadoDeAlta` para un futuro Bounded Context de Alquileres). Ahí sí habría dos escrituras a coordinar en la misma transacción, y ahí sí entra Transactional Outbox.
 
 ### El dual write real está en Keycloak (y no lo podemos arreglar)
