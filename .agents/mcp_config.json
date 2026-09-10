@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "videoclub": {
+      "command": "python3",
+      "args": [
+        "/home/horacio/proyectos/unrn/taller/springboot-sso/.agents/scripts/mcp-bridge.py"
+      ],
+      "env": {
+        "KEYCLOAK_URL": "http://localhost:9091",
+        "KEYCLOAK_REALM": "videoclub",
+        "KEYCLOAK_CLIENT_ID": "videoclub-mcp",
+        "KEYCLOAK_USER": "usuarioadmin",
+        "KEYCLOAK_PASSWORD": "usuarioadmin",
+        "MCP_URL": "http://localhost:8080/mcp"
+      }
+    }
+  }
+}

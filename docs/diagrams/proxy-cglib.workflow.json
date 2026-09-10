@@ -1,0 +1,220 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Donde poner @PreAuthorize en una tool MCP",
+    "output": "docs/diagrams/proxy-cglib.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "roto",
+        "label": "El camino intuitivo",
+        "focus": [
+          "metodo",
+          "junto",
+          "proxy",
+          "scan",
+          "cero"
+        ],
+        "note": "Anotar el propio metodo @McpTool deja el servidor sin herramientas, y sin un solo error."
+      },
+      {
+        "id": "actual",
+        "label": "El diseno implementado",
+        "focus": [
+          "metodo",
+          "delegado",
+          "servicio",
+          "cinco"
+        ],
+        "note": "La clase de tools queda sin proxy; la autorizacion vive en un delegado aparte."
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "roto",
+      "label": "Anotar el mismo metodo",
+      "variant": "exception"
+    },
+    {
+      "id": "origen",
+      "label": "Punto de partida"
+    },
+    {
+      "id": "actual",
+      "label": "Delegar la autorizacion"
+    }
+  ],
+  "phases": [
+    {
+      "id": "decision",
+      "label": "La decision",
+      "fromCol": 0,
+      "toCol": 0
+    },
+    {
+      "id": "consecuencia",
+      "label": "Que hace Spring",
+      "fromCol": 1,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "final",
+      "label": "Resultado",
+      "fromCol": 4,
+      "toCol": 4
+    }
+  ],
+  "mainPath": [
+    "metodo",
+    "delegado",
+    "servicio",
+    "cinco"
+  ],
+  "nodes": [
+    {
+      "id": "metodo",
+      "lane": "origen",
+      "col": 0,
+      "type": "backend",
+      "label": "Metodo @McpTool",
+      "sublabel": "listMovies()",
+      "width": 140
+    },
+    {
+      "id": "junto",
+      "lane": "roto",
+      "col": 1,
+      "type": "security",
+      "label": "@PreAuthorize encima",
+      "sublabel": "en el mismo metodo",
+      "width": 152
+    },
+    {
+      "id": "proxy",
+      "lane": "roto",
+      "col": 2,
+      "type": "backend",
+      "label": "Proxy CGLIB",
+      "sublabel": "MovieMcpTools$$SpringCGLIB$$0",
+      "width": 184
+    },
+    {
+      "id": "scan",
+      "lane": "roto",
+      "col": 3,
+      "type": "backend",
+      "label": "getDeclaredMethods()",
+      "sublabel": "lee el proxy, no el target",
+      "width": 168
+    },
+    {
+      "id": "cero",
+      "lane": "roto",
+      "col": 4,
+      "type": "security",
+      "label": "0 tools",
+      "sublabel": "el servidor arranca limpio",
+      "tag": "fallo silencioso",
+      "width": 152
+    },
+    {
+      "id": "delegado",
+      "lane": "actual",
+      "col": 2,
+      "type": "security",
+      "label": "AuthorizedMovieQueries",
+      "sublabel": "@PreAuthorize, proxiado",
+      "width": 176
+    },
+    {
+      "id": "servicio",
+      "lane": "actual",
+      "col": 3,
+      "type": "backend",
+      "label": "MovieService",
+      "sublabel": "consulta el catalogo",
+      "width": 148
+    },
+    {
+      "id": "cinco",
+      "lane": "actual",
+      "col": 4,
+      "type": "backend",
+      "label": "5 tools",
+      "sublabel": "visibles y autorizadas",
+      "tag": "McpToolsSecurityTest",
+      "width": 160
+    }
+  ],
+  "edges": [
+    {
+      "id": "hacia-junto",
+      "from": "metodo",
+      "to": "junto",
+      "label": "anotar el metodo",
+      "variant": "security",
+      "role": "branch"
+    },
+    {
+      "id": "junto-proxy",
+      "from": "junto",
+      "to": "proxy",
+      "label": "Spring envuelve el bean",
+      "variant": "default"
+    },
+    {
+      "id": "proxy-scan",
+      "from": "proxy",
+      "to": "scan",
+      "variant": "default"
+    },
+    {
+      "id": "scan-cero",
+      "from": "scan",
+      "to": "cero",
+      "label": "los overrides no heredan anotaciones",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "hacia-delegado",
+      "from": "metodo",
+      "to": "delegado",
+      "label": "delegar sin anotar la tool",
+      "variant": "emphasis"
+    },
+    {
+      "id": "delegado-servicio",
+      "from": "delegado",
+      "to": "servicio",
+      "variant": "default"
+    },
+    {
+      "id": "servicio-cinco",
+      "from": "servicio",
+      "to": "cinco",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "Por que falla en silencio",
+      "items": [
+        "El BeanPostProcessor detecta el bean con AopUtils.getTargetClass",
+        "Pero el proveedor lee los metodos del proxy: queda registrado y aporta cero tools"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "La regla que queda",
+      "items": [
+        "Una clase de tools no lleva ninguna anotacion que dispare proxy",
+        "Si alguien la agrega, everyToolIsDiscoverable rompe el build"
+      ]
+    }
+  ]
+}
