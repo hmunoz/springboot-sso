@@ -9,8 +9,9 @@ Replaces the legacy, deprecated `keycloak-to-rabbit-3.0.5.jar` with a native imp
 ## 1. Architecture & AMQP Topology
 
 ### Exchange
-- **Default Exchange**: `amq.topic` (configurable via `RABBITMQ_EXCHANGE`).
-- **Exchange Type**: `topic`
+- **Default Exchange**: `keycloak.events` (configurable via `RABBITMQ_EXCHANGE`).
+- **Exchange Type**: `topic`, durable
+- **Declared by this SPI on startup** via `exchangeDeclare`, so the exchange does not need to pre-exist. Declaring is idempotent, so pointing `RABBITMQ_EXCHANGE` at a pre-defined exchange such as `amq.topic` keeps working.
 
 ### Routing Key Conventions
 
@@ -29,7 +30,7 @@ In an Event-Driven Architecture (EDA) using RabbitMQ, **filtering happens at the
 
 ### Recommended Subscription (User Lifecycle Only)
 
-If you only want to receive user creation, modification, and deletion (ignoring logins, logouts, client changes, etc.), bind your queue to `amq.topic` with the following routing keys:
+If you only want to receive user creation, modification, and deletion (ignoring logins, logouts, client changes, etc.), bind your queue to `keycloak.events` with the following routing keys:
 
 ```text
 keycloak.admin.USER.*
@@ -111,7 +112,7 @@ The SPI reads connection parameters from environment variables defined in `docke
 | `RABBITMQ_USER` | `guest` | RabbitMQ username |
 | `RABBITMQ_PASS` | `guest` | RabbitMQ password |
 | `RABBITMQ_VHOST` | `/` | Virtual host |
-| `RABBITMQ_EXCHANGE` | `amq.topic` | Target topic exchange name |
+| `RABBITMQ_EXCHANGE` | `keycloak.events` | Target topic exchange name; declared as a durable topic exchange at startup |
 
 ---
 

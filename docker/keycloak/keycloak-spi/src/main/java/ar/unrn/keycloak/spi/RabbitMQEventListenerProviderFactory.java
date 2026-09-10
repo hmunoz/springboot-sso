@@ -24,7 +24,8 @@ import java.util.logging.Logger;
  *   <li>RABBITMQ_USER (default: guest)</li>
  *   <li>RABBITMQ_PASS (default: guest)</li>
  *   <li>RABBITMQ_VHOST (default: /)</li>
- *   <li>RABBITMQ_EXCHANGE (default: amq.topic)</li>
+ *   <li>RABBITMQ_EXCHANGE (default: keycloak.events) — declared as a durable topic
+ *       exchange on startup, so it does not need to pre-exist</li>
  * </ul>
  */
 public class RabbitMQEventListenerProviderFactory implements EventListenerProviderFactory {
@@ -48,7 +49,7 @@ public class RabbitMQEventListenerProviderFactory implements EventListenerProvid
         String user = env("RABBITMQ_USER", "guest");
         String pass = env("RABBITMQ_PASS", "guest");
         String vhost = env("RABBITMQ_VHOST", "/");
-        exchange = env("RABBITMQ_EXCHANGE", "amq.topic");
+        exchange = env("RABBITMQ_EXCHANGE", "keycloak.events");
 
         try {
             ConnectionFactory factory = new ConnectionFactory();

@@ -17,7 +17,10 @@ services:
       RABBITMQ_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_PASS: ${RABBITMQ_DEFAULT_PASS}
       RABBITMQ_VHOST: ${RABBITMQ_DEFAULT_VHOST}
-      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE}
+      # A default is required here: without it an undefined variable makes Compose
+      # inject an empty string, the SPI falls back to its own default, and publisher and
+      # consumer end up on different exchanges with no error reported anywhere.
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-keycloak.events}
     ports:
       - "${KEYCLOAK_PORT:-9090}:8080"
     # json export tiene realm videoclub, client videoclub-backend y videoclub-frontend, usuario, grupos y roles

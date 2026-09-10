@@ -93,7 +93,7 @@ keycloak:
     client-id: ${KEYCLOAK_BACKEND_CLIENT_ID:videoclub-backend}
     client-secret: ${KEYCLOAK_BACKEND_CLIENT_SECRET:dstNSsANvqlaGfZCJa1mcYzP1EBAYP4N}
   rabbitmq:
-    exchange: ${RABBITMQ_EXCHANGE:amq.topic}
+    exchange: ${RABBITMQ_EXCHANGE:keycloak.events}
     queue: ${KEYCLOAK_RABBITMQ_QUEUE:keycloak-events}
     routing-keys:
       - "keycloak.user.#"
