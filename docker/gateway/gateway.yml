@@ -42,19 +42,3 @@ spring:
               filters:
                 - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
 
-            # Rutas con prefijo para compatibilidad retroactiva
-            - id: legacy-catalogo
-              uri: http://host.docker.internal:8080
-              predicates:
-                - Path=/catalogo/**
-              filters:
-                - StripPrefix=1
-                - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
-
-            - id: legacy-gateway
-              uri: http://host.docker.internal:8080
-              predicates:
-                - Path=/gateway/**
-              filters:
-                - StripPrefix=1
-                - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
