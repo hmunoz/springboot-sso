@@ -13,12 +13,18 @@ import java.util.concurrent.TimeUnit;
 /**
  * Publishes canonical domain events to the business exchange.
  *
- * <p>Publishing is confirmed synchronously on purpose. This class is called from inside a
- * {@code @RabbitListener}, and if the publish silently failed after the inbound message
- * had already been acknowledged, the event would vanish with no trace. Waiting for the
- * broker confirmation lets the failure propagate so the inbound message is not acked.
+ * <p>
+ * Publishing is confirmed synchronously on purpose. This class is called from
+ * inside a
+ * {@code @RabbitListener}, and if the publish silently failed after the inbound
+ * message
+ * had already been acknowledged, the event would vanish with no trace. Waiting
+ * for the
+ * broker confirmation lets the failure propagate so the inbound message is not
+ * acked.
  *
- * <p>Requires {@code spring.rabbitmq.publisher-confirm-type: correlated}.
+ * <p>
+ * Requires {@code spring.rabbitmq.publisher-confirm-type: correlated}.
  */
 @Slf4j
 @Service
@@ -30,7 +36,7 @@ public class MessagePublisher {
     private final String exchange;
 
     public MessagePublisher(RabbitTemplate rabbitTemplate,
-                            @Value("${videoclub.rabbitmq.exchange:videoclub.events}") String exchange) {
+            @Value("${videoclub.rabbitmq.exchange:videoclub.events}") String exchange) {
         this.rabbitTemplate = rabbitTemplate;
         this.exchange = exchange;
     }
@@ -42,10 +48,9 @@ public class MessagePublisher {
         rabbitTemplate.convertAndSend(exchange, routingKey, event, correlation);
 
         try {
-            CorrelationData.Confirm confirm =
-                    correlation.getFuture().get(CONFIRM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            CorrelationData.Confirm confirm = correlation.getFuture().get(CONFIRM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 
-            if (!confirm.isAck()) {
+            if (!confirm.ack()) {
                 throw new AmqpException("Broker rejected domain event [%s]: %s"
                         .formatted(routingKey, confirm.reason()));
             }
