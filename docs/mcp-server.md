@@ -158,3 +158,4 @@ La suite [McpToolsSecurityTest.java](file:///home/horacio/proyectos/unrn/taller/
 2. Que una llamada anónima falle con `AuthenticationCredentialsNotFoundException`.
 3. Que un usuario con rol `movie-permission-read` pueda consultar películas pero reciba `AccessDeniedException` al consultar socios.
 4. Que un usuario con rol `socio-permission-read` acceda a la información del padrón.
+
