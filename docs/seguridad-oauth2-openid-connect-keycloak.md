@@ -216,6 +216,20 @@ sequenceDiagram
     Keycloak->>Browser: Emite sesión y redirige a la SPA
 ```
 
+### Decisión de diseño: Flujos Built-in vs. Required Actions
+
+En la consola de Keycloak (**Authentication -> Flows**), todos los flujos (`browser`, `registration`, `direct grant`, `reset credentials`, `clients`, etc.) permanecen en su estado original **Built-in**, sin modificaciones directas ni clonaciones.
+
+> **El antipatrón común:** Al buscar exigir MFA o alterar el registro, la tentación habitual suele ser clonar el flujo `browser` o `registration` para forzar pasos obligatorios. Esto genera deuda técnica inmediata: flujos duplicados que quedan desactualizados ante upgrades de Keycloak y configuraciones acopladas difíciles de mantener.
+
+Este diseño aprovecha la separación de responsabilidades nativa de Keycloak:
+
+1. **Authentication Flows (Intactos):** Definen la máquina de estados de autenticación. El flujo built-in `browser` ya incluye de fábrica el subflujo condicional `Browser - Conditional OTP` con la verificación `conditional-user-configured` (*"solicitar el segundo factor solo si el usuario lo tiene configurado"*).
+2. **Required Actions (Punto de extensión):** En lugar de alterar el flujo para forzar el enrolamiento, se activa la acción requerida `CONFIGURE_TOTP` con `defaultAction: true` (pestaña *Required actions*). Esto intercepta el primer login de cualquier cuenta nueva y le exige registrar su autenticador antes de emitir tokens.
+3. **Políticas de Realm:** El auto-registro se habilita con `registrationAllowed: true` y la asignación inicial con `defaultGroups`, apoyándose en el flujo built-in `registration` sin necesidad de tocarlo.
+
+El resultado es un sistema que logra MFA obligatorio y auto-registro con **cero modificaciones sobre los flujos base**, garantizando compatibilidad y mantenimiento limpio.
+
 ---
 
 ## 6. Modelado: Grupos como Identidad, Roles como Permisos
