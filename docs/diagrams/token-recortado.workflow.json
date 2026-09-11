@@ -1,0 +1,62 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Por que el token del agente sale recortado",
+    "output": "docs/diagrams/token-recortado.html",
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "app", "label": "Camino de la app", "focus": ["usuario", "via_front", "token_front"], "note": "La SPA recibe los 7 permisos que el usuario tiene asignados en el realm." },
+      { "id": "agente", "label": "Camino del agente", "focus": ["usuario", "via_mcp", "gate", "token_mcp"], "note": "El mismo usuario, por otro cliente, obtiene solo los dos permisos de lectura." }
+    ]
+  },
+  "lanes": [
+    { "id": "identidad", "label": "Identidad" },
+    { "id": "app", "label": "Cliente de la aplicacion" },
+    { "id": "agente", "label": "Cliente del agente MCP" }
+  ],
+  "phases": [
+    { "id": "quien", "label": "Quien pide", "fromCol": 0, "toCol": 0 },
+    { "id": "porque", "label": "Por que cliente", "fromCol": 1, "toCol": 2, "variant": "emphasis" },
+    { "id": "resultado", "label": "Que token sale", "fromCol": 3, "toCol": 4 }
+  ],
+  "mainPath": ["usuario", "via_mcp", "gate", "token_mcp", "tools"],
+  "nodes": [
+    { "id": "usuario", "lane": "identidad", "col": 0, "type": "external", "label": "usuarioadmin", "sublabel": "7 permisos en el realm", "width": 140 },
+
+    { "id": "via_front", "lane": "app", "col": 1, "type": "frontend", "label": "videoclub-frontend", "sublabel": "la SPA del videoclub", "width": 148 },
+    { "id": "token_front", "lane": "app", "col": 3, "type": "backend", "label": "Token completo", "sublabel": "7 roles", "tag": "incluye delete", "width": 140 },
+
+    { "id": "via_mcp", "lane": "agente", "col": 1, "type": "frontend", "label": "videoclub-mcp", "sublabel": "el cliente del agente", "width": 148 },
+    { "id": "gate", "lane": "agente", "col": 2, "type": "security", "label": "fullScopeAllowed = false", "sublabel": "filtra por el scope del cliente", "tag": "clientScopeMappings", "width": 176 },
+    { "id": "token_mcp", "lane": "agente", "col": 3, "type": "backend", "label": "Token recortado", "sublabel": "2 roles de lectura", "width": 140 },
+    { "id": "tools", "lane": "agente", "col": 4, "type": "backend", "label": "Tools MCP", "sublabel": "list_movies, list_socios", "width": 152 }
+  ],
+  "edges": [
+    { "id": "hacia-app", "from": "usuario", "to": "via_front", "label": "login en la app", "variant": "default", "role": "branch" },
+    { "id": "app-token", "from": "via_front", "to": "token_front", "variant": "default" },
+
+    { "id": "hacia-mcp", "from": "usuario", "to": "via_mcp", "label": "OAuth del agente", "variant": "emphasis" },
+    { "id": "mcp-gate", "from": "via_mcp", "to": "gate", "variant": "security" },
+    { "id": "gate-token", "from": "gate", "to": "token_mcp", "label": "solo lo declarado en el scope", "variant": "emphasis" },
+    { "id": "token-tools", "from": "token_mcp", "to": "tools", "variant": "default" }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "Mismo usuario, misma clave",
+      "items": [
+        "Los permisos son client roles de videoclub-frontend",
+        "Por la SPA salen los 7: create, update, delete, read y los de usuarios"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "El permiso no se bloquea: no existe",
+      "items": [
+        "El scope de videoclub-mcp solo admite los dos permisos de lectura",
+        "Un agente no puede borrar una pelicula ni aunque el usuario pueda"
+      ]
+    }
+  ]
+}

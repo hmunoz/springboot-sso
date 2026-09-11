@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "videoclub": {
+      "type": "http",
+      "url": "http://localhost:8080/mcp",
+      "oauth": {
+        "clientId": "videoclub-mcp",
+        "callbackPort": 8090
+      }
+    }
+  }
+}

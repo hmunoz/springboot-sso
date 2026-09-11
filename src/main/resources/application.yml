@@ -5,6 +5,23 @@ spring:
     import:
       - optional:file:.env[.properties]
 
+  # Servidor MCP (Model Context Protocol).
+  # protocol: SSE | STREAMABLE | STATELESS. STATELESS resuelve cada llamada como un POST
+  # normal, de modo que el SecurityContext y los @PreAuthorize de las tools se evaluan
+  # igual que en cualquier endpoint REST y el token se revalida en cada request.
+  ai:
+    mcp:
+      server:
+        name: videoclub-mcp-server
+        version: 1.0.0
+        type: sync
+        protocol: stateless
+        streamable-http:
+          mcp-endpoint: /mcp
+        instructions: >
+          Herramientas de consulta del VideoClub UNRN: catalogo de peliculas y padron de
+          socios. Todas las operaciones son de solo lectura.
+
   #Seguridad
   security:
     oauth2:
@@ -82,6 +99,9 @@ springdoc:
       use-pkce-with-authorization-code-grant: true
 
 videoclub:
+  mcp:
+    # Identificador publico del recurso MCP que se anuncia en /.well-known/oauth-protected-resource
+    resource-uri: ${MCP_RESOURCE_URI:http://localhost:8080/mcp}
   rabbitmq:
     exchange: ${VIDEOCLUB_EXCHANGE:videoclub.events}
     socio-queue: ${VIDEOCLUB_SOCIO_QUEUE:socio.events.queue}

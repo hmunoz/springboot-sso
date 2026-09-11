@@ -1,0 +1,236 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "VideoClub MCP: descubrimiento, OAuth y consulta",
+    "output": "docs/diagrams/mcp-oauth-flow.html",
+    "viewBox": [
+      1060,
+      540
+    ],
+    "column_fit": "spread",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "descubrimiento",
+        "label": "Descubrimiento",
+        "focus": [
+          "cliente",
+          "mcp"
+        ],
+        "note": "El 401 le dice al cliente donde autenticarse. Sin esto haria falta un bridge."
+      },
+      {
+        "id": "oauth",
+        "label": "OAuth con PKCE",
+        "focus": [
+          "cliente",
+          "keycloak",
+          "usuario"
+        ],
+        "note": "El cliente usa videoclub-mcp, cuyo scope solo admite los dos permisos de lectura."
+      },
+      {
+        "id": "consulta",
+        "label": "Consulta autorizada",
+        "focus": [
+          "cliente",
+          "mcp",
+          "db"
+        ],
+        "note": "El JWT se valida y el PreAuthorize del delegado decide antes de tocar la base."
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "usuario",
+      "type": "external",
+      "label": "Usuario",
+      "sublabel": "navegador"
+    },
+    {
+      "id": "cliente",
+      "type": "frontend",
+      "label": "Cliente MCP",
+      "sublabel": "Claude Code"
+    },
+    {
+      "id": "mcp",
+      "type": "backend",
+      "label": "Spring Boot",
+      "sublabel": "endpoint /mcp"
+    },
+    {
+      "id": "keycloak",
+      "type": "security",
+      "label": "Keycloak",
+      "sublabel": "realm videoclub"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "catalogo y socios"
+    }
+  ],
+  "segments": [
+    {
+      "from": 148,
+      "to": 264,
+      "label": "Descubrimiento"
+    },
+    {
+      "from": 274,
+      "to": 360,
+      "label": "OAuth con PKCE"
+    },
+    {
+      "from": 370,
+      "to": 456,
+      "label": "Consulta autorizada"
+    }
+  ],
+  "messages": [
+    {
+      "id": "sin-token",
+      "from": "cliente",
+      "to": "mcp",
+      "y": 160,
+      "label": "POST /mcp sin token",
+      "variant": "default"
+    },
+    {
+      "id": "reto-401",
+      "from": "mcp",
+      "to": "cliente",
+      "y": 190,
+      "label": "401 + WWW-Authenticate con resource_metadata",
+      "variant": "security"
+    },
+    {
+      "id": "pide-metadata",
+      "from": "cliente",
+      "to": "mcp",
+      "y": 220,
+      "label": "GET /.well-known/oauth-protected-resource",
+      "variant": "default"
+    },
+    {
+      "id": "metadata",
+      "from": "mcp",
+      "to": "cliente",
+      "y": 250,
+      "label": "authorization_servers: realm videoclub",
+      "variant": "return"
+    },
+    {
+      "id": "authz",
+      "from": "cliente",
+      "to": "keycloak",
+      "y": 286,
+      "label": "authorization_code + PKCE, client_id videoclub-mcp",
+      "variant": "security"
+    },
+    {
+      "id": "login",
+      "from": "usuario",
+      "to": "keycloak",
+      "y": 316,
+      "label": "el usuario se autentica",
+      "variant": "security"
+    },
+    {
+      "id": "token",
+      "from": "keycloak",
+      "to": "cliente",
+      "y": 346,
+      "label": "access_token 30 min, solo 2 permisos de lectura",
+      "variant": "return",
+      "note": "fullScopeAllowed=false recorta el token: los permisos de escritura no entran"
+    },
+    {
+      "id": "tool-call",
+      "from": "cliente",
+      "to": "mcp",
+      "y": 382,
+      "label": "tools/call list_movies + Bearer",
+      "variant": "emphasis"
+    },
+    {
+      "id": "select",
+      "from": "mcp",
+      "to": "db",
+      "y": 412,
+      "label": "select sobre movie",
+      "variant": "default",
+      "note": "Antes: Spring valida el JWT contra el JWKS y el PreAuthorize exige movie-permission-read"
+    },
+    {
+      "id": "respuesta",
+      "from": "mcp",
+      "to": "cliente",
+      "y": 442,
+      "label": "Interstellar, Matrix",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "cliente",
+      "from": 155,
+      "to": 448,
+      "type": "frontend"
+    },
+    {
+      "participant": "mcp",
+      "from": 155,
+      "to": 256,
+      "type": "backend"
+    },
+    {
+      "participant": "mcp",
+      "from": 377,
+      "to": 448,
+      "type": "backend"
+    },
+    {
+      "participant": "keycloak",
+      "from": 281,
+      "to": 352,
+      "type": "security"
+    },
+    {
+      "participant": "usuario",
+      "from": 311,
+      "to": 322,
+      "type": "external"
+    },
+    {
+      "participant": "db",
+      "from": 407,
+      "to": 424,
+      "type": "database"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "El 401 es la documentacion",
+      "items": [
+        "El cliente no sabe nada de Keycloak al arrancar",
+        "El WWW-Authenticate le indica donde leer la metadata RFC 9728",
+        "Por eso no hace falta un bridge stdio en Node"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Solo lectura por construccion",
+      "items": [
+        "El token sale por videoclub-mcp, no por videoclub-frontend",
+        "Su scope solo admite movie-permission-read y socio-permission-read",
+        "Un permiso de escritura no se bloquea: nunca entra al token"
+      ]
+    }
+  ]
+}

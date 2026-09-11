@@ -659,6 +659,22 @@
           "view-groups"
         ]
       }
+    ],
+    "videoclub-frontend": [
+      {
+        "client": "videoclub-mcp",
+        "roles": [
+          "movie-permission-read",
+          "socio-permission-read"
+        ]
+      },
+      {
+        "clientScope": "videoclub",
+        "roles": [
+          "movie-permission-read",
+          "socio-permission-read"
+        ]
+      }
     ]
   },
   "clients": [
@@ -1129,6 +1145,90 @@
       "protocolMappers": [
         {
           "id": "e44d32a1-1234-4567-89ab-cdef01234567",
+          "name": "Group Mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "groups",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ],
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "basic",
+        "email",
+        "videoclub"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "id": "3f9c1d84-6b2e-4c0a-9f77-2a5d8e41b6c3",
+      "clientId": "videoclub-mcp",
+      "name": "videoclub-mcp",
+      "description": "Cliente publico para agentes MCP (Claude, MCP Inspector). Solo lectura.",
+      "rootUrl": "",
+      "adminUrl": "",
+      "baseUrl": "",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "http://localhost:6274/*",
+        "http://127.0.0.1:6274/*",
+        "http://localhost:8090/*",
+        "http://127.0.0.1:8090/*"
+      ],
+      "webOrigins": [
+        "http://localhost:6274",
+        "http://127.0.0.1:6274"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "client.introspection.response.allow.jwt.claim.enabled": "false",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "backchannel.logout.revoke.offline.tokens": "false",
+        "use.refresh.tokens": "true",
+        "oidc.ciba.grant.enabled": "false",
+        "client.use.lightweight.access.token.enabled": "false",
+        "backchannel.logout.session.required": "true",
+        "client_credentials.use_refresh_token": "false",
+        "tls.client.certificate.bound.access.tokens": "false",
+        "require.pushed.authorization.requests": "false",
+        "acr.loa.map": "{}",
+        "display.on.consent.screen": "false",
+        "token.response.type.bearer.lower-case": "false",
+        "access.token.lifespan": "1800"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": false,
+      "nodeReRegistrationTimeout": -1,
+      "protocolMappers": [
+        {
+          "id": "9a1b7c53-4e08-42d6-8f31-7c6ba0d95e12",
           "name": "Group Mapper",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-group-membership-mapper",
@@ -1834,7 +1934,8 @@
     "roles",
     "web-origins",
     "acr",
-    "basic"
+    "basic",
+    "videoclub"
   ],
   "defaultOptionalClientScopes": [
     "offline_access",
@@ -2059,6 +2160,11 @@
           ],
           "client-uris-must-match": [
             "true"
+          ],
+          "trusted-hosts": [
+            "localhost",
+            "127.0.0.1",
+            "172.25.0.1"
           ]
         }
       },

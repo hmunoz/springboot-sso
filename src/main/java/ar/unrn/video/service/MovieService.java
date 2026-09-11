@@ -25,6 +25,13 @@ public class MovieService {
                 .toList();
     }
 
+    public List<MovieDTO> search(final String query) {
+        final List<Movie> movies = movieRepository.findByTitleContainingIgnoreCase(query, Sort.by("id"));
+        return movies.stream()
+                .map(movie -> mapToDTO(movie, new MovieDTO()))
+                .toList();
+    }
+
     public MovieDTO get(final Long id) {
         return movieRepository.findById(id)
                 .map(movie -> mapToDTO(movie, new MovieDTO()))

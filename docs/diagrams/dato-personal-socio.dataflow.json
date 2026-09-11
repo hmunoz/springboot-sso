@@ -1,0 +1,201 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Recorrido del dato personal del socio",
+    "output": "docs/diagrams/dato-personal-socio.html",
+    "viewBox": [
+      1075,
+      600
+    ],
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "origen",
+        "label": "De donde viene",
+        "focus": [
+          "keycloak",
+          "rabbit",
+          "spring"
+        ],
+        "note": "El dato nace en Keycloak y viaja por RabbitMQ hasta la aplicacion."
+      },
+      {
+        "id": "reposo",
+        "label": "Donde queda",
+        "focus": [
+          "spring",
+          "db"
+        ],
+        "note": "Email, nombre y apellido quedan en la tabla socio de PostgreSQL."
+      },
+      {
+        "id": "consumo",
+        "label": "Quien lo lee",
+        "focus": [
+          "gate",
+          "spa",
+          "mcp"
+        ],
+        "note": "Un unico permiso decide, y desde hoy tiene un consumidor nuevo: un agente de IA."
+      }
+    ]
+  },
+  "stages": [
+    {
+      "label": "Origen"
+    },
+    {
+      "label": "Transporte"
+    },
+    {
+      "label": "Aplicacion y reposo"
+    },
+    {
+      "label": "Control de acceso"
+    },
+    {
+      "label": "Consumo"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "keycloak",
+      "type": "security",
+      "label": "Keycloak",
+      "sublabel": "alta y baja de usuarios",
+      "stage": 0,
+      "row": 1,
+      "tag": "dato personal",
+      "width": 132
+    },
+    {
+      "id": "rabbit",
+      "type": "messagebus",
+      "label": "RabbitMQ",
+      "sublabel": "exchange keycloak.events",
+      "stage": 1,
+      "row": 1,
+      "tag": "en transito",
+      "width": 132
+    },
+    {
+      "id": "spring",
+      "type": "backend",
+      "label": "Spring Boot",
+      "sublabel": "SocioEventListener",
+      "stage": 2,
+      "row": 0,
+      "width": 136
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "tabla socio",
+      "stage": 2,
+      "row": 2,
+      "tag": "email, nombre, apellido",
+      "width": 140
+    },
+    {
+      "id": "gate",
+      "type": "security",
+      "label": "socio-permission-read",
+      "sublabel": "@PreAuthorize",
+      "stage": 3,
+      "row": 1,
+      "tag": "unico control",
+      "width": 152
+    },
+    {
+      "id": "spa",
+      "type": "frontend",
+      "label": "React SPA",
+      "sublabel": "vista de administrador",
+      "stage": 4,
+      "row": 0,
+      "width": 132
+    },
+    {
+      "id": "mcp",
+      "type": "backend",
+      "label": "Tools MCP",
+      "sublabel": "list_socios, get_socio",
+      "stage": 4,
+      "row": 2,
+      "tag": "agente de IA",
+      "width": 140
+    }
+  ],
+  "flows": [
+    {
+      "id": "evento-usuario",
+      "from": "keycloak",
+      "to": "rabbit",
+      "label": "alta, baja y cambios",
+      "classification": "dato personal",
+      "variant": "security",
+      "labelDy": -46
+    },
+    {
+      "id": "evento-socio",
+      "from": "rabbit",
+      "to": "spring",
+      "label": "evento Socio",
+      "classification": "en transito",
+      "variant": "emphasis"
+    },
+    {
+      "id": "upsert",
+      "from": "spring",
+      "to": "db",
+      "label": "upsert del socio",
+      "classification": "dato personal en reposo",
+      "variant": "default",
+      "labelDy": 62
+    },
+    {
+      "id": "lectura",
+      "from": "db",
+      "to": "gate",
+      "label": "lectura del padron",
+      "classification": "sin filtrar",
+      "variant": "default"
+    },
+    {
+      "id": "hacia-spa",
+      "from": "gate",
+      "to": "spa",
+      "label": "GET /api/socios",
+      "classification": "consumidor conocido",
+      "variant": "default"
+    },
+    {
+      "id": "hacia-mcp",
+      "from": "gate",
+      "to": "mcp",
+      "label": "list_socios",
+      "classification": "consumidor nuevo",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "El dato no se queda quieto",
+      "items": [
+        "Email, nombre y apellido nacen en Keycloak, no en la aplicacion",
+        "Viajan por RabbitMQ y quedan en reposo en la tabla socio"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "La frontera que cambio",
+      "items": [
+        "Hasta ayer el padron solo salia hacia la SPA, con un humano del otro lado",
+        "Ahora tambien sale hacia un agente de IA, por el mismo permiso"
+      ]
+    }
+  ]
+}
