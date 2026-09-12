@@ -13,6 +13,7 @@ import org.keycloak.events.Event;
 import org.keycloak.events.EventListenerProvider;
 
 import java.nio.charset.StandardCharsets;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -41,11 +42,15 @@ public class RabbitMQEventListenerProvider implements EventListenerProvider {
             .deliveryMode(2)
             .build();
 
-    private final Channel channel;
+    private final Supplier<Channel> channelSupplier;
     private final String exchange;
 
     public RabbitMQEventListenerProvider(Channel channel, String exchange) {
-        this.channel = channel;
+        this(() -> channel, exchange);
+    }
+
+    public RabbitMQEventListenerProvider(Supplier<Channel> channelSupplier, String exchange) {
+        this.channelSupplier = channelSupplier;
         this.exchange = exchange;
     }
 
@@ -149,13 +154,16 @@ public class RabbitMQEventListenerProvider implements EventListenerProvider {
     }
 
     private void publish(String routingKey, ObjectNode payload) throws Exception {
-        if (channel == null || !channel.isOpen()) {
+        Channel ch = channelSupplier != null ? channelSupplier.get() : null;
+        if (ch == null || !ch.isOpen()) {
             LOG.warning(String.format("RabbitMQ channel not available — dropping event [%s]", routingKey));
             return;
         }
 
         byte[] body = MAPPER.writeValueAsString(payload).getBytes(StandardCharsets.UTF_8);
-        channel.basicPublish(exchange, routingKey, MESSAGE_PROPERTIES_JSON, body);
+        synchronized (ch) {
+            ch.basicPublish(exchange, routingKey, MESSAGE_PROPERTIES_JSON, body);
+        }
 
         LOG.fine(String.format("Published event to exchange '%s' with routing key '%s'", exchange, routingKey));
     }

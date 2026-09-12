@@ -8,6 +8,9 @@ services:
     extends:
       file: ./keycloak.yaml
       service: keycloak
+    depends_on:
+      rabbit:
+        condition: service_healthy
   rabbit:
     extends:
       file: ./rabbit.yaml

@@ -10,7 +10,7 @@ Bienvenido a la documentación técnica, arquitectónica y operativa de la plata
 Compilación completa de los 12 ADRs del sistema, detallando el contexto, opciones descartadas, decisiones adoptadas y trade-offs:
 * **ADR-001 a ADR-005:** Mensajería, topología de exchanges, consistencia eventual y dominio de Socios.
 * **ADR-006 a ADR-007:** API Gateway, enrutamiento desacoplado y separación de planos de identidad.
-* **ADR-008 a ADR-012:** Servidor Model Context Protocol (MCP), Streamable HTTP, delegados proxiados de autorización y clientes de IA.
+* **ADR-008 a ADR-012:** Servidor Model Context Protocol (MCP), Streamable HTTP, autorización sobre las propias tools y clientes de IA.
 
 ---
 
@@ -44,7 +44,7 @@ Compilación completa de los 12 ADRs del sistema, detallando el contexto, opcion
 ### 5. [Servidor Model Context Protocol (MCP) con Spring AI](mcp-server.md)
 * Integración del servidor MCP mediante **Spring AI 2.x** sobre **Streamable HTTP en modo `STATELESS`** (`POST /mcp`).
 * Catálogo de 5 herramientas de consulta de solo lectura (`get_movie`, `list_movies`, `search_movies`, `get_socio`, `list_socios`).
-* **Patrón de Delegación Proxiada:** Separación entre beans `@McpTool` y beans `@PreAuthorize` para preservar el descubrimiento de herramientas evitando limitaciones de proxies CGLIB.
+* **Autorización en la propia tool:** `@PreAuthorize` sobre cada método `@McpTool`, verificado contra el descubrimiento proxy-consciente de Spring AI 2.0.1; el riesgo asumido y su vuelta atrás están documentados y cubiertos por tests centinela.
 * Control de acceso basado en identidad: consultas diferenciadas para perfil administrador (`usuarioadmin`) y perfil socio (`usuariocliente`).
 * Integración dual con clientes de IA:
   * **Claude Code CLI:** Flujo interactivo OAuth 2.0 PKCE con descubrimiento RFC 9728 (`/.well-known/oauth-protected-resource`).

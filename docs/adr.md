@@ -14,7 +14,7 @@ Este documento centraliza todos los **Architecture Decision Records (ADR)** del 
 * [ADR-006: Ruteo Orientado a Recursos (Resource-Based Facade) en API Gateway](#adr-006-ruteo-orientado-a-recursos-resource-based-facade-en-api-gateway)
 * [ADR-007: Exclusión de Keycloak del API Gateway (Separación de Planos)](#adr-007-exclusión-de-keycloak-del-api-gateway-separación-de-planos)
 * [ADR-008: Servidor MCP sobre Streamable HTTP en Modo `STATELESS`](#adr-008-servidor-mcp-sobre-streamable-http-en-modo-stateless)
-* [ADR-009: Delegación Proxiada para `@PreAuthorize` en Herramientas MCP](#adr-009-delegación-proxiada-para-preauthorize-en-herramientas-mcp)
+* [ADR-009: `@PreAuthorize` directo sobre los métodos `@McpTool`](#adr-009-preauthorize-directo-sobre-los-métodos-mcptool)
 * [ADR-010: Metadatos de Recursos Protegidos (RFC 9728) y Clientes MCP Públicos con PKCE](#adr-010-metadatos-de-recursos-protegidos-rfc-9728-y-clientes-mcp-públicos-con-pkce)
 * [ADR-011: Declaración Explícita de Hints de Solo Lectura en Herramientas MCP](#adr-011-declaración-explícita-de-hints-de-solo-lectura-en-herramientas-mcp)
 * [ADR-012: Bridge Stdio con Direct Access Grants para Clientes No Interactivos (Antigravity)](#adr-012-bridge-stdio-con-direct-access-grants-para-clientes-no-interactivos-antigravity)
@@ -199,25 +199,31 @@ Adoptar **Streamable HTTP en modo `STATELESS`** sobre el endpoint `POST /mcp`.
 
 ---
 
-### ADR-009: Delegación Proxiada para `@PreAuthorize` en Herramientas MCP
+### ADR-009: `@PreAuthorize` directo sobre los métodos `@McpTool`
 
 * **Estado:** Aceptado e Implementado
 * **Fecha:** Septiembre 2026
+* **Reemplaza a:** la versión previa de este ADR, que adoptaba un patrón Delegate (`AuthorizedMovieQueries` / `AuthorizedSocioQueries`) por creer que `@PreAuthorize` sobre un método `@McpTool` rompía el descubrimiento de herramientas. Esa premisa se verificó y resultó **falsa** para Spring AI 2.0.1.
 
 #### Contexto
-Se requería aplicar control de acceso en las herramientas MCP para que un socio no pueda ejecutar operaciones de administrador (como listar el padrón de socios). Sin embargo, al colocar `@PreAuthorize` directamente en los métodos `@McpTool`, las herramientas dejaban de ser detectadas por Spring AI.
+Los servicios de dominio (`MovieService`, `SocioService`) no tienen control de acceso propio: los protege la capa REST. Las herramientas MCP los alcanzan por debajo de esa capa, así que necesitan su propia autorización.
+
+La opción directa —anotar los métodos `@McpTool` con `@PreAuthorize`— se descartaba por una creencia extendida: que el proxy CGLIB resultante deja al servidor MCP publicando cero herramientas. Se verificó contra Spring AI 2.0.1 y **no ocurre**. La autoconfiguración registra las tools vía `SyncMcpAnnotationProviders`, cuyo descubrimiento resuelve `AopUtils.getTargetClass(bean)` antes de leer los métodos; la invocación por reflexión sobre la instancia proxy sigue atravesando el interceptor de Spring Security. El análisis completo está en [mcp-server.md §4](mcp-server.md#4-arquitectura-de-autorización-preauthorize-sobre-las-tools).
 
 #### Decisión
-Separar las responsabilidades en dos beans distintos:
-1. **Beans de Tools (`MovieMcpTools`, `SocioMcpTools`):** `@Component` limpios con métodos `@McpTool`, sin ninguna anotación que dispare proxies AOP.
-2. **Beans Delegados (`AuthorizedMovieQueries`, `AuthorizedSocioQueries`):** `@Component` donde residen las anotaciones `@PreAuthorize`.
+Colocar `@PreAuthorize` directamente sobre cada método `@McpTool`, en `MovieMcpTools` y `SocioMcpTools`, y eliminar los beans delegados.
 
 #### Justificación
-* Spring AI detecta herramientas inspeccionando `getClass().getDeclaredMethods()`. Si la clase de la tool tiene `@PreAuthorize`, Spring la envuelve en un proxy CGLIB (`MovieMcpTools$$SpringCGLIB$$0`), cuyos métodos generados no heredan las anotaciones originales, provocando que el servidor MCP arranque anunciando **cero herramientas**.
-* El delegado proxiado asegura que la introspección de `@McpTool` funcione sobre la clase real, mientras que la invocación interna atraviesa el proxy de Spring Security, garantizando que si falta el permiso se lance `AccessDeniedException`.
+* **Legibilidad:** el permiso queda al lado de la operación que protege. No hay que saltar entre dos clases para responder "¿quién puede llamar a esta tool?".
+* **Menos superficie:** se eliminan dos `@Component` y un salto de indirección por agregado, sin perder ninguna garantía de seguridad.
+* **Riesgo acotado y observable:** la dependencia que se asume está cubierta por tests que la convierten en build rojo (ver Consecuencias).
 
 #### Consecuencias
-* **Positivas:** Herramientas descubribles por MCP y autorización robusta de grano fino funcionando en simultáneo.
+* **Positivas:** Herramientas descubribles y autorización de grano fino sobre los mismos métodos, con dos clases menos.
+* **Negativas — la que importa:** el arreglo depende de un **detalle de implementación interno** de Spring AI, no de un contrato publicado. La API pública `AbstractMcpToolProvider` sigue leyendo `bean.getClass().getDeclaredMethods()` y es ciega a los proxies. Si un upgrade elimina el override proxy-consciente de `SyncMcpAnnotationProviders`, el servidor arranca **sin errores en los logs** y publica una lista vacía de herramientas.
+* **Mitigación:** `McpToolsSecurityTest#everyToolIsDiscoverable` ejercita el camino exacto de producción sobre beans proxiados, y `#publicProviderApiIsProxyBlind` fija el comportamiento de la API pública. Cualquier cambio en Spring AI en cualquiera de las dos direcciones produce un build rojo antes del deploy.
+* **Vuelta atrás:** reintroducir el patrón Delegate, documentado paso a paso en [mcp-server.md §4](mcp-server.md#-cómo-corregirlo-si-rompe).
+* **Riesgo secundario inactivo:** el descubrimiento invoca `Method` de la clase target sobre el proxy; con un proxy dinámico JDK fallaría con `IllegalArgumentException`. Hoy no aplica (CGLIB por defecto, sin interfaces).
 
 ---
 
