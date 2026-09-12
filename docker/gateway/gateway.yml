@@ -42,3 +42,9 @@ spring:
               filters:
                 - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
 
+            - id: agent-service
+              uri: http://host.docker.internal:8085
+              predicates:
+                - Path=/api/agent/**
+              filters:
+                - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
