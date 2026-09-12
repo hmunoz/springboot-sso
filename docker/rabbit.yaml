@@ -16,6 +16,11 @@ services:
       - "5672:5672"
     labels:
       NAME: "rabbitmq1"
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     #volumes:
       #- "./enabled_plugins:/etc/rabbitmq/enabled_plugins"
       #- "./rabbitmq.config:/etc/rabbitmq/rabbitmq.config:ro"

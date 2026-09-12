@@ -32,10 +32,18 @@ public class RabbitMQEventListenerProviderFactory implements EventListenerProvid
 
     private static final Logger LOG = Logger.getLogger(RabbitMQEventListenerProviderFactory.class.getName());
     public static final String PROVIDER_ID = "rabbitmq-event-listener";
+    private static final long MIN_RECONNECT_INTERVAL_MS = 5000;
 
     private Connection connection;
     private Channel channel;
     private String exchange;
+
+    private String host;
+    private int port;
+    private String user;
+    private String pass;
+    private String vhost;
+    private long lastConnectAttemptTime = 0;
 
     @Override
     public String getId() {
@@ -44,13 +52,17 @@ public class RabbitMQEventListenerProviderFactory implements EventListenerProvid
 
     @Override
     public void init(org.keycloak.Config.Scope config) {
-        String host = env("RABBITMQ_HOST", "localhost");
-        int port = Integer.parseInt(env("RABBITMQ_PORT", "5672"));
-        String user = env("RABBITMQ_USER", "guest");
-        String pass = env("RABBITMQ_PASS", "guest");
-        String vhost = env("RABBITMQ_VHOST", "/");
+        host = env("RABBITMQ_HOST", "localhost");
+        port = Integer.parseInt(env("RABBITMQ_PORT", "5672"));
+        user = env("RABBITMQ_USER", "guest");
+        pass = env("RABBITMQ_PASS", "guest");
+        vhost = env("RABBITMQ_VHOST", "/");
         exchange = env("RABBITMQ_EXCHANGE", "keycloak.events");
 
+        tryConnect();
+    }
+
+    private synchronized void tryConnect() {
         try {
             ConnectionFactory factory = new ConnectionFactory();
             factory.setHost(host);
@@ -59,23 +71,55 @@ public class RabbitMQEventListenerProviderFactory implements EventListenerProvid
             factory.setPassword(pass);
             factory.setVirtualHost(vhost);
             factory.setAutomaticRecoveryEnabled(true);
+            factory.setConnectionTimeout(3000);
 
             connection = factory.newConnection("keycloak-spi");
             channel = connection.createChannel();
 
-            // The producer declares what it needs to publish to. Without this, pointing
-            // RABBITMQ_EXCHANGE at anything other than the built-in amq.topic makes the
-            // first publish fail with a 404 and close this long-lived channel, after which
-            // every event is silently dropped until Keycloak is restarted.
-            // Declaring is idempotent, so re-declaring amq.topic with matching properties
-            // is a no-op.
+            // The producer declares what it needs to publish to.
             channel.exchangeDeclare(exchange, "topic", true);
 
             LOG.info(String.format("RabbitMQ SPI connected to %s:%d (exchange: %s, declared as durable topic)",
                     host, port, exchange));
         } catch (Exception e) {
-            LOG.log(Level.SEVERE, String.format("Failed to connect to RabbitMQ at %s:%d — events will not be published", host, port), e);
+            LOG.log(Level.WARNING, String.format("Failed to connect to RabbitMQ at %s:%d — will retry on next event: %s",
+                    host, port, e.getMessage()));
+            tryClose();
         }
+    }
+
+    private synchronized void tryClose() {
+        try {
+            if (channel != null && channel.isOpen()) {
+                channel.close();
+            }
+        } catch (Exception ignored) {
+        } finally {
+            channel = null;
+        }
+
+        try {
+            if (connection != null && connection.isOpen()) {
+                connection.close();
+            }
+        } catch (Exception ignored) {
+        } finally {
+            connection = null;
+        }
+    }
+
+    public synchronized Channel getChannel() {
+        if (channel != null && channel.isOpen()) {
+            return channel;
+        }
+        long now = System.currentTimeMillis();
+        if (now - lastConnectAttemptTime < MIN_RECONNECT_INTERVAL_MS) {
+            return null;
+        }
+        lastConnectAttemptTime = now;
+        tryClose();
+        tryConnect();
+        return channel;
     }
 
     @Override
@@ -85,22 +129,13 @@ public class RabbitMQEventListenerProviderFactory implements EventListenerProvid
 
     @Override
     public EventListenerProvider create(KeycloakSession session) {
-        return new RabbitMQEventListenerProvider(channel, exchange);
+        return new RabbitMQEventListenerProvider(this::getChannel, exchange);
     }
 
     @Override
     public void close() {
-        try {
-            if (channel != null && channel.isOpen()) {
-                channel.close();
-            }
-            if (connection != null && connection.isOpen()) {
-                connection.close();
-            }
-            LOG.info("RabbitMQ SPI connection closed");
-        } catch (Exception e) {
-            LOG.log(Level.WARNING, "Error closing RabbitMQ connection", e);
-        }
+        tryClose();
+        LOG.info("RabbitMQ SPI connection closed");
     }
 
     private static String env(String name, String defaultValue) {

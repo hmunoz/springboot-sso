@@ -83,21 +83,64 @@ El servidor expone 5 herramientas de consulta. Todas declaran explícitamente an
 
 ## 4. Arquitectura de Autorización: Delegados Proxiados
 
-Para evitar que Spring Security envuelva las clases `@McpTool` en proxies CGLIB (lo cual ocultaría las anotaciones de las herramientas frente al scanner de Spring AI), se desacopla la definición de la tool de su frontera de seguridad:
+### ¿Por qué no se puede anotar `@PreAuthorize` directamente en `@McpTool`?
+
+La tentación habitual al asegurar una herramienta MCP es colocar `@PreAuthorize` directamente sobre el método anotado con `@McpTool`:
+
+```java
+// ❌ ANTIPATRÓN: Rompe el descubrimiento de herramientas
+@Component
+public class MovieMcpTools {
+    @McpTool(name = "list_movies")
+    @PreAuthorize("hasAuthority('movie-permission-read')") // <-- Provoca el fallo silencioso
+    public List<MovieDTO> listMovies() { ... }
+}
+```
+
+Esto desencadena un fallo silencioso crítico debido a la interacción entre **Spring AOP** y la **Reflexión en Java**:
+
+1. **Proxy CGLIB de Spring Security:**  
+   Cuando un bean contiene métodos anotados con `@PreAuthorize`, Spring Security genera en tiempo de ejecución un proxy dinámico mediante CGLIB (una subclase generada como `MovieMcpTools$$SpringCGLIB$$0`) para interceptar las llamadas y validar el `SecurityContext`.
+2. **Descubrimiento por Reflexión en Spring AI:**  
+   El scanner de herramientas (`SyncStatelessMcpToolProvider`) recolecta las herramientas inspeccionando los métodos del bean mediante reflexión clásica:
+   ```java
+   bean.getClass().getDeclaredMethods()
+   ```
+3. **Pérdida de anotaciones en métodos sobreescritos:**  
+   En la especificación del lenguaje Java, **las anotaciones en métodos NO se heredan** cuando una subclase sobreescribe un método (a diferencia de `@Inherited` a nivel de clase). Al llamar a `getClass().getDeclaredMethods()` sobre el proxy CGLIB, Java retorna los métodos sobreescritos del proxy, los cuales carecen de la anotación `@McpTool`.
+4. **Consecuencia:**  
+   El escáner encuentra cero métodos anotados. El servidor MCP arranca sin errores visibles en los logs, pero publica una lista vacía de herramientas (`tools/list` devuelve `[]`), dejando a los clientes de IA sin comandos utilizables.
+
+---
+
+### La Solución: Patrón Delegate / Authorization Boundary
+
+Para conservar simultáneamente el descubrimiento de herramientas y la seguridad declarativa de métodos, se desacopla la definición de la tool de su frontera de autorización:
+
+```mermaid
+flowchart LR
+    Agent["Cliente IA<br/>(Claude / Antigravity)"] -->|"tools/call list_movies"| McpTools["MovieMcpTools<br/>(Bean puro, sin proxy CGLIB)<br/>getClass() expone @McpTool"]
+    McpTools -->|"findAll()"| Auth["AuthorizedMovieQueries<br/>(Proxy CGLIB con @PreAuthorize)<br/>Valida authorities en SecurityContext"]
+    Auth -->|"Autorizado"| Service["MovieService"]
+```
 
 1. **Beans de Herramientas (`MovieMcpTools`, `SocioMcpTools`):**
-   * Anotados con `@Component`.
-   * Contienen los métodos `@McpTool` puros sin `@PreAuthorize`.
-   * Inyectan y delegan inmediatamente la consulta en el bean autorizado.
+   * Anotados con `@Component` exclusivamente.
+   * Libres de cualquier anotación que desencadene proxies (`@PreAuthorize`, `@Transactional`, `@Cacheable`).
+   * Al no tener proxies, `getClass().getDeclaredMethods()` inspecciona directamente la clase original y registra todas las `@McpTool`.
+   * Inyectan y delegan inmediatamente la ejecución en el bean autorizado.
+
 2. **Beans Delegados (`AuthorizedMovieQueries`, `AuthorizedSocioQueries`):**
    * Anotados con `@Component` y `@PreAuthorize`.
-   * Ejecutan la verificación de privilegios sobre el `SecurityContext` autenticado:
+   * Son envueltos por proxies CGLIB legítimamente para ejecutar la verificación de permisos sobre el token Bearer:
      ```java
      @PreAuthorize("hasAuthority('socio-permission-read')")
      public List<SocioDTO> findAllSocios() {
          return socioService.findAll();
      }
      ```
+
+> **Test Centinela:** En [McpToolsSecurityTest.java](file:///home/horacio/proyectos/unrn/taller/springboot-sso/src/test/java/ar/unrn/video/McpToolsSecurityTest.java#L102-L118), el test `everyToolIsDiscoverable()` instancia directamente un `SyncStatelessMcpToolProvider` y valida que las 5 herramientas se descubran correctamente. Si algún desarrollador añade `@PreAuthorize` o `@Transactional` en la clase de herramientas, este test falla inmediatamente impidiendo el despliegue.
 
 ### Comportamiento por Perfil de Usuario
 * **`usuarioadmin` (Administrador):** Posee `movie-permission-read` y `socio-permission-read`. Puede invocar las 5 herramientas.
