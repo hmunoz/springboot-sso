@@ -61,6 +61,7 @@ spring:
 ```
 
 ### Características del Modo `STATELESS`
+
 * **Validación per-request:** Cada petición es un POST HTTP independiente donde Spring Security evalúa el token Bearer en el hilo del servlet.
 * **Sin sesiones en memoria:** Permite escalar horizontalmente sin afinidad de sesiones (*sticky sessions*).
 * **Cabecera requerida:** Las peticiones deben incluir `Accept: application/json, text/event-stream` y `Content-Type: application/json`.
@@ -103,9 +104,11 @@ Esto desencadena un fallo silencioso crítico debido a la interacción entre **S
    Cuando un bean contiene métodos anotados con `@PreAuthorize`, Spring Security genera en tiempo de ejecución un proxy dinámico mediante CGLIB (una subclase generada como `MovieMcpTools$$SpringCGLIB$$0`) para interceptar las llamadas y validar el `SecurityContext`.
 2. **Descubrimiento por Reflexión en Spring AI:**  
    El scanner de herramientas (`SyncStatelessMcpToolProvider`) recolecta las herramientas inspeccionando los métodos del bean mediante reflexión clásica:
+
    ```java
    bean.getClass().getDeclaredMethods()
    ```
+
 3. **Pérdida de anotaciones en métodos sobreescritos:**  
    En la especificación del lenguaje Java, **las anotaciones en métodos NO se heredan** cuando una subclase sobreescribe un método (a diferencia de `@Inherited` a nivel de clase). Al llamar a `getClass().getDeclaredMethods()` sobre el proxy CGLIB, Java retorna los métodos sobreescritos del proxy, los cuales carecen de la anotación `@McpTool`.
 4. **Consecuencia:**  
@@ -133,6 +136,7 @@ flowchart LR
 2. **Beans Delegados (`AuthorizedMovieQueries`, `AuthorizedSocioQueries`):**
    * Anotados con `@Component` y `@PreAuthorize`.
    * Son envueltos por proxies CGLIB legítimamente para ejecutar la verificación de permisos sobre el token Bearer:
+
      ```java
      @PreAuthorize("hasAuthority('socio-permission-read')")
      public List<SocioDTO> findAllSocios() {
@@ -143,6 +147,7 @@ flowchart LR
 > **Test Centinela:** En [McpToolsSecurityTest.java](file:///home/horacio/proyectos/unrn/taller/springboot-sso/src/test/java/ar/unrn/video/McpToolsSecurityTest.java#L102-L118), el test `everyToolIsDiscoverable()` instancia directamente un `SyncStatelessMcpToolProvider` y valida que las 5 herramientas se descubran correctamente. Si algún desarrollador añade `@PreAuthorize` o `@Transactional` en la clase de herramientas, este test falla inmediatamente impidiendo el despliegue.
 
 ### Comportamiento por Perfil de Usuario
+
 * **`usuarioadmin` (Administrador):** Posee `movie-permission-read` y `socio-permission-read`. Puede invocar las 5 herramientas.
 * **`usuariocliente` (Socio):** Solo posee `movie-permission-read`. Si el agente intenta invocar `list_socios` o `get_socio`, Spring Security bloquea la llamada y responde un error JSON-RPC con `isError: true` y mensaje `Access Denied`.
 
@@ -151,6 +156,7 @@ flowchart LR
 ## 5. Integración con Clientes de IA
 
 ### Opción A: Claude Code CLI (OAuth 2.0 PKCE Interactivo)
+
 Utiliza el soporte nativo de descubrimiento **RFC 9728** publicado en `/.well-known/oauth-protected-resource`:
 
 ```bash
@@ -166,6 +172,7 @@ claude mcp add --transport http \
 4. Recibe el callback en `http://localhost:8090/*` y almacena las credenciales en su almacén local.
 
 ### Opción B: Antigravity IDE (Stdio Bridge Desatendido)
+
 Antigravity no posee un servidor de callbacks OAuth interactivo para conexiones locales. Se utiliza un bridge en Python ([`.agents/scripts/mcp-bridge.py`](file:///home/horacio/proyectos/unrn/taller/springboot-sso/.agents/scripts/mcp-bridge.py)) configurado en [`.agents/mcp_config.json`](file:///home/horacio/proyectos/unrn/taller/springboot-sso/.agents/mcp_config.json):
 
 ```json
@@ -197,8 +204,8 @@ Antigravity no posee un servidor de callbacks OAuth interactivo para conexiones 
 ## 6. Pruebas Automatizadas
 
 La suite [McpToolsSecurityTest.java](file:///home/horacio/proyectos/unrn/taller/springboot-sso/src/test/java/ar/unrn/video/McpToolsSecurityTest.java) verifica de forma aislada:
+
 1. Que las 5 herramientas sean descubribles por el `SyncStatelessMcpToolProvider` de Spring AI.
 2. Que una llamada anónima falle con `AuthenticationCredentialsNotFoundException`.
 3. Que un usuario con rol `movie-permission-read` pueda consultar películas pero reciba `AccessDeniedException` al consultar socios.
 4. Que un usuario con rol `socio-permission-read` acceda a la información del padrón.
-
