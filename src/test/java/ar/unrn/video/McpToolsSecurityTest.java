@@ -1,7 +1,5 @@
 package ar.unrn.video;
 
-import ar.unrn.video.mcp.AuthorizedMovieQueries;
-import ar.unrn.video.mcp.AuthorizedSocioQueries;
 import ar.unrn.video.mcp.MovieMcpTools;
 import ar.unrn.video.mcp.SocioMcpTools;
 import ar.unrn.video.model.MovieDTO;
@@ -11,6 +9,8 @@ import ar.unrn.video.service.SocioService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.mcp.annotation.provider.tool.SyncStatelessMcpToolProvider;
+import org.springframework.ai.mcp.annotation.spring.SyncMcpAnnotationProviders;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,6 +25,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -37,8 +38,11 @@ import static org.mockito.Mockito.when;
  *   <li>no tool returns data to a caller lacking the matching authority.</li>
  * </ol>
  *
- * <p>Both matter together, because the obvious way to satisfy the second one — putting
- * {@code @PreAuthorize} straight on the {@code @McpTool} methods — silently breaks the first.
+ * <p>Both obligations are met on the same methods: {@code @PreAuthorize} sits directly on the
+ * {@code @McpTool} methods, which proxies the tool beans. That works only because the production
+ * discovery path resolves the proxy's target class — see {@link MovieMcpTools} for the mechanism
+ * and the risk. The two discovery tests below pin both sides of that bet, so a Spring AI upgrade
+ * that changes either one produces a red build instead of a server with no tools.
  *
  * <p>A minimal context is used on purpose: method security is real, the services are mocked, and
  * no database, broker or Keycloak is needed.
@@ -72,23 +76,13 @@ class McpToolsSecurityTest {
         }
 
         @Bean
-        AuthorizedMovieQueries authorizedMovieQueries(MovieService movieService) {
-            return new AuthorizedMovieQueries(movieService);
+        MovieMcpTools movieMcpTools(MovieService movieService) {
+            return new MovieMcpTools(movieService);
         }
 
         @Bean
-        AuthorizedSocioQueries authorizedSocioQueries(SocioService socioService) {
-            return new AuthorizedSocioQueries(socioService);
-        }
-
-        @Bean
-        MovieMcpTools movieMcpTools(AuthorizedMovieQueries movies) {
-            return new MovieMcpTools(movies);
-        }
-
-        @Bean
-        SocioMcpTools socioMcpTools(AuthorizedSocioQueries socios) {
-            return new SocioMcpTools(socios);
+        SocioMcpTools socioMcpTools(SocioService socioService) {
+            return new SocioMcpTools(socioService);
         }
 
     }
@@ -100,13 +94,16 @@ class McpToolsSecurityTest {
     private SocioMcpTools socioMcpTools;
 
     @Test
-    @DisplayName("every tool is discoverable as a Spring bean")
+    @DisplayName("every tool is discoverable through the path the running server uses")
     void everyToolIsDiscoverable() {
-        // The tool provider reads methods off getClass().getDeclaredMethods(). Adding any
-        // proxy-triggering annotation to the tool classes empties this list, and the MCP server
-        // would then boot with no tools at all. This assertion is the guard against that.
-        List<String> toolNames = new SyncStatelessMcpToolProvider(List.of(movieMcpTools, socioMcpTools))
-                .getToolSpecifications()
+        // SyncMcpAnnotationProviders is what the Spring Boot autoconfiguration calls. Its providers
+        // resolve AopUtils.getTargetClass(bean) before reading methods, which is the only reason
+        // @PreAuthorize can sit on a @McpTool method. If a Spring AI upgrade drops that, the server
+        // would boot advertising nothing at all; this assertion is what makes it fail loudly first.
+        assertTrue(AopUtils.isAopProxy(movieMcpTools), "the tool bean is expected to be proxied");
+
+        List<String> toolNames = SyncMcpAnnotationProviders
+                .statelessToolSpecifications(List.of(movieMcpTools, socioMcpTools))
                 .stream()
                 .map(spec -> spec.tool().name())
                 .sorted()
@@ -115,6 +112,21 @@ class McpToolsSecurityTest {
         assertEquals(
                 List.of("get_movie", "get_socio", "list_movies", "list_socios", "search_movies"),
                 toolNames);
+    }
+
+    @Test
+    @DisplayName("the public provider API stays proxy-blind, which is the accepted risk")
+    void publicProviderApiIsProxyBlind() {
+        // Spring AI's public AbstractMcpToolProvider reads bean.getClass().getDeclaredMethods(),
+        // so on a proxied tool bean it finds nothing. This is documented here rather than hidden:
+        // it is the exact failure the server would suffer if the internal proxy-aware override in
+        // SyncMcpAnnotationProviders ever went away. Should this assertion start failing because
+        // the public API became proxy-aware, the risk is gone and this test can go with it.
+        assertEquals(
+                0,
+                new SyncStatelessMcpToolProvider(List.of(movieMcpTools, socioMcpTools))
+                        .getToolSpecifications()
+                        .size());
     }
 
     @Test

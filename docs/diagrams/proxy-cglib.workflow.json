@@ -2,75 +2,94 @@
   "schema_version": 2,
   "diagram_type": "workflow",
   "meta": {
-    "title": "Donde poner @PreAuthorize en una tool MCP",
-    "output": "docs/diagrams/proxy-cglib.html",
+    "title": "Cómo Spring AI descubre una tool anotada con @PreAuthorize",
     "quality_profile": "showcase",
+    "output": "docs/diagrams/proxy-cglib.html",
     "views": [
       {
-        "id": "roto",
-        "label": "El camino intuitivo",
+        "id": "real",
+        "label": "El camino que corre",
         "focus": [
           "metodo",
-          "junto",
           "proxy",
-          "scan",
-          "cero"
-        ],
-        "note": "Anotar el propio metodo @McpTool deja el servidor sin herramientas, y sin un solo error."
-      },
-      {
-        "id": "actual",
-        "label": "El diseno implementado",
-        "focus": [
-          "metodo",
-          "delegado",
-          "servicio",
+          "autoconfig",
+          "target",
           "cinco"
         ],
-        "note": "La clase de tools queda sin proxy; la autorizacion vive en un delegado aparte."
+        "note": "La autoconfiguración resuelve la clase target antes de leer los métodos: las 5 tools se publican y el permiso se exige."
+      },
+      {
+        "id": "publico",
+        "label": "El camino que falla",
+        "focus": [
+          "proxy",
+          "apipublica",
+          "declared",
+          "cero"
+        ],
+        "note": "La API pública sigue siendo ciega a los proxies. Ahí sí aparecen cero herramientas, y es el riesgo que se asume."
       }
     ]
   },
   "lanes": [
     {
-      "id": "roto",
-      "label": "Anotar el mismo metodo",
-      "variant": "exception"
-    },
-    {
       "id": "origen",
-      "label": "Punto de partida"
+      "label": "El bean anotado"
     },
     {
-      "id": "actual",
-      "label": "Delegar la autorizacion"
+      "id": "real",
+      "label": "Autoconfiguración de Spring Boot"
+    },
+    {
+      "id": "publico",
+      "label": "API pública de Spring AI",
+      "variant": "exception"
     }
   ],
   "phases": [
     {
-      "id": "decision",
-      "label": "La decision",
+      "id": "bean",
+      "label": "Qué hace Spring",
       "fromCol": 0,
-      "toCol": 0
+      "toCol": 1
     },
     {
-      "id": "consecuencia",
-      "label": "Que hace Spring",
-      "fromCol": 1,
+      "id": "lectura",
+      "label": "Cómo se leen los métodos",
+      "fromCol": 2,
       "toCol": 3,
       "variant": "emphasis"
     },
     {
-      "id": "final",
+      "id": "resultado",
       "label": "Resultado",
       "fromCol": 4,
       "toCol": 4
     }
   ],
+  "groups": [
+    {
+      "id": "camino_real",
+      "label": "Lo que ejecuta la aplicación",
+      "lane": "real",
+      "fromCol": 2,
+      "toCol": 4,
+      "variant": "emphasis"
+    },
+    {
+      "id": "camino_ciego",
+      "label": "Proveedor construido a mano",
+      "lane": "publico",
+      "fromCol": 2,
+      "toCol": 4,
+      "variant": "security"
+    }
+  ],
   "mainPath": [
     "metodo",
-    "delegado",
-    "servicio",
+    "proxy",
+    "autoconfig",
+    "target",
     "cinco"
   ],
   "nodes": [
@@ -79,141 +98,143 @@
       "lane": "origen",
       "col": 0,
       "type": "backend",
-      "label": "Metodo @McpTool",
-      "sublabel": "listMovies()",
-      "width": 140
-    },
-    {
-      "id": "junto",
-      "lane": "roto",
-      "col": 1,
-      "type": "security",
-      "label": "@PreAuthorize encima",
-      "sublabel": "en el mismo metodo",
-      "width": 152
+      "label": "Método @McpTool",
+      "sublabel": "con @PreAuthorize encima",
+      "width": 134
     },
     {
       "id": "proxy",
-      "lane": "roto",
-      "col": 2,
-      "type": "backend",
+      "lane": "origen",
+      "col": 1,
+      "type": "security",
       "label": "Proxy CGLIB",
       "sublabel": "MovieMcpTools$$SpringCGLIB$$0",
-      "width": 184
-    },
-    {
-      "id": "scan",
-      "lane": "roto",
-      "col": 3,
-      "type": "backend",
-      "label": "getDeclaredMethods()",
-      "sublabel": "lee el proxy, no el target",
+      "tag": "los overrides no heredan anotaciones",
       "width": 168
     },
     {
-      "id": "cero",
-      "lane": "roto",
-      "col": 4,
-      "type": "security",
-      "label": "0 tools",
-      "sublabel": "el servidor arranca limpio",
-      "tag": "fallo silencioso",
-      "width": 152
-    },
-    {
-      "id": "delegado",
-      "lane": "actual",
+      "id": "autoconfig",
+      "lane": "real",
       "col": 2,
-      "type": "security",
-      "label": "AuthorizedMovieQueries",
-      "sublabel": "@PreAuthorize, proxiado",
-      "width": 176
+      "type": "cloud",
+      "label": "SyncMcpAnnotationProviders",
+      "sublabel": "fábrica de la autoconfiguración",
+      "width": 201
     },
     {
-      "id": "servicio",
-      "lane": "actual",
+      "id": "target",
+      "lane": "real",
       "col": 3,
       "type": "backend",
-      "label": "MovieService",
-      "sublabel": "consulta el catalogo",
-      "width": 148
+      "label": "AopUtils.getTargetClass",
+      "sublabel": "resuelve la clase real primero",
+      "tag": "acá se salva",
+      "width": 180
     },
     {
       "id": "cinco",
-      "lane": "actual",
+      "lane": "real",
       "col": 4,
       "type": "backend",
-      "label": "5 tools",
-      "sublabel": "visibles y autorizadas",
-      "tag": "McpToolsSecurityTest",
-      "width": 160
+      "label": "5 tools publicadas",
+      "sublabel": "y el permiso se exige",
+      "width": 156,
+      "tag": "lo que realmente corre"
+    },
+    {
+      "id": "apipublica",
+      "lane": "publico",
+      "col": 2,
+      "type": "external",
+      "label": "AbstractMcpToolProvider",
+      "sublabel": "la API que cualquiera instancia",
+      "width": 180
+    },
+    {
+      "id": "declared",
+      "lane": "publico",
+      "col": 3,
+      "type": "external",
+      "label": "getDeclaredMethods()",
+      "sublabel": "lee los métodos del proxy",
+      "width": 174
+    },
+    {
+      "id": "cero",
+      "lane": "publico",
+      "col": 4,
+      "type": "messagebus",
+      "label": "0 tools",
+      "sublabel": "el servidor arranca vacío",
+      "tag": "sin un solo error en el log",
+      "width": 150
     }
   ],
   "edges": [
     {
-      "id": "hacia-junto",
+      "id": "anotar",
       "from": "metodo",
-      "to": "junto",
-      "label": "anotar el metodo",
-      "variant": "security",
+      "to": "proxy",
+      "label": "Spring envuelve el bean",
+      "variant": "security"
+    },
+    {
+      "id": "a-autoconfig",
+      "from": "proxy",
+      "to": "autoconfig",
+      "variant": "emphasis"
+    },
+    {
+      "id": "a-target",
+      "from": "autoconfig",
+      "to": "target",
+      "variant": "emphasis"
+    },
+    {
+      "id": "a-cinco",
+      "from": "target",
+      "to": "cinco",
+      "label": "encuentra las anotaciones",
+      "variant": "emphasis"
+    },
+    {
+      "id": "a-publica",
+      "from": "proxy",
+      "to": "apipublica",
+      "label": "mismo bean, otro lector",
+      "variant": "dashed",
       "role": "branch"
     },
     {
-      "id": "junto-proxy",
-      "from": "junto",
-      "to": "proxy",
-      "label": "Spring envuelve el bean",
-      "variant": "default"
+      "id": "a-declared",
+      "from": "apipublica",
+      "to": "declared",
+      "variant": "dashed"
     },
     {
-      "id": "proxy-scan",
-      "from": "proxy",
-      "to": "scan",
-      "variant": "default"
-    },
-    {
-      "id": "scan-cero",
-      "from": "scan",
+      "id": "a-cero",
+      "from": "declared",
       "to": "cero",
-      "label": "los overrides no heredan anotaciones",
+      "label": "no ve ningún @McpTool",
       "variant": "security",
       "role": "error"
-    },
-    {
-      "id": "hacia-delegado",
-      "from": "metodo",
-      "to": "delegado",
-      "label": "delegar sin anotar la tool",
-      "variant": "emphasis"
-    },
-    {
-      "id": "delegado-servicio",
-      "from": "delegado",
-      "to": "servicio",
-      "variant": "default"
-    },
-    {
-      "id": "servicio-cinco",
-      "from": "servicio",
-      "to": "cinco",
-      "variant": "emphasis"
     }
   ],
   "cards": [
     {
-      "dot": "rose",
-      "title": "Por que falla en silencio",
+      "dot": "cyan",
+      "title": "Verificado en Spring AI 2.0.1",
       "items": [
-        "El BeanPostProcessor detecta el bean con AopUtils.getTargetClass",
-        "Pero el proveedor lee los metodos del proxy: queda registrado y aporta cero tools"
+        "La autoconfiguración resuelve la clase target antes de leer los métodos",
+        "La invocación sobre el proxy atraviesa el interceptor de Spring Security"
       ]
     },
     {
-      "dot": "emerald",
-      "title": "La regla que queda",
+      "dot": "rose",
+      "title": "El riesgo que se asume",
       "items": [
-        "Una clase de tools no lleva ninguna anotacion que dispare proxy",
-        "Si alguien la agrega, everyToolIsDiscoverable rompe el build"
+        "El override proxy-consciente es un detalle interno, no un contrato publicado",
+        "McpToolsSecurityTest cubre los dos caminos y falla antes del deploy"
       ]
     }
   ]

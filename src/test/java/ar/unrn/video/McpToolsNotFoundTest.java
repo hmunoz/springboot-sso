@@ -1,7 +1,7 @@
 package ar.unrn.video;
 
-import ar.unrn.video.mcp.AuthorizedMovieQueries;
-import ar.unrn.video.mcp.AuthorizedSocioQueries;
+import ar.unrn.video.mcp.MovieMcpTools;
+import ar.unrn.video.mcp.SocioMcpTools;
 import ar.unrn.video.service.MovieService;
 import ar.unrn.video.service.SocioService;
 import ar.unrn.video.util.NotFoundException;
@@ -16,6 +16,9 @@ import static org.mockito.Mockito.when;
 /**
  * Over MCP the exception message is the entire error the agent receives; a bare
  * {@link NotFoundException} would reach it as "null".
+ *
+ * <p>The tools are built directly here rather than taken from a context, so no proxy is involved
+ * and the assertions are about the message alone, never about authorization.
  */
 class McpToolsNotFoundTest {
 
@@ -26,7 +29,7 @@ class McpToolsNotFoundTest {
         when(movieService.get(99999L)).thenThrow(new NotFoundException());
 
         NotFoundException ex = assertThrows(NotFoundException.class,
-                () -> new AuthorizedMovieQueries(movieService).get(99999L));
+                () -> new MovieMcpTools(movieService).getMovie(99999L));
 
         assertEquals("No movie found with id 99999", ex.getMessage());
     }
@@ -38,7 +41,7 @@ class McpToolsNotFoundTest {
         when(socioService.getById(99999L)).thenThrow(new NotFoundException());
 
         NotFoundException ex = assertThrows(NotFoundException.class,
-                () -> new AuthorizedSocioQueries(socioService).getById(99999L));
+                () -> new SocioMcpTools(socioService).getSocio(99999L));
 
         assertEquals("No member found with id 99999", ex.getMessage());
     }
