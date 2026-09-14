@@ -110,7 +110,7 @@ class McpToolsSecurityTest {
                 .toList();
 
         assertEquals(
-                List.of("get_movie", "get_socio", "list_movies", "list_socios", "search_movies"),
+                List.of("create_movie", "get_movie", "get_socio", "list_movies", "list_socios", "search_movies"),
                 toolNames);
     }
 

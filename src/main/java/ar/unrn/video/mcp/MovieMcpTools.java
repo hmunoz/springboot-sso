@@ -110,4 +110,47 @@ public class MovieMcpTools {
         return movieService.search(query == null ? "" : query);
     }
 
+    @McpTool(
+            name = "create_movie",
+            annotations = @McpTool.McpAnnotations(
+                    readOnlyHint = false, destructiveHint = false, idempotentHint = false, openWorldHint = false
+            ),
+            title = "Create movie",
+            description = "Creates a new movie in the VideoClub catalog. "
+                    + "Returns the identifier assigned to the newly created movie. "
+                    + "Title must be unique (case-insensitive). "
+                    + "genre must be one of: ACTION, COMEDY, DRAMA, HORROR, SCIENCE_FICTION, ROMANCE, THRILLER, ANIMATION, DOCUMENTARY, FANTASY (or omit). "
+                    + "price is the rental price as a decimal string, e.g. '150.00' (or omit). "
+                    + "imageUrl is an optional URL pointing to the cover image."
+    )
+    @PreAuthorize("hasAuthority('movie-permission-create')")
+    public Long createMovie(
+            @McpToolParam(description = "Unique title of the movie", required = true)
+            final String title,
+            @McpToolParam(description = "Genre string (optional): ACTION, COMEDY, DRAMA, HORROR, SCIENCE_FICTION, ROMANCE, THRILLER, ANIMATION, DOCUMENTARY, FANTASY", required = false)
+            final String genre,
+            @McpToolParam(description = "Rental price as decimal string, e.g. '150.00' (optional)", required = false)
+            final String price,
+            @McpToolParam(description = "URL of the cover image (optional)", required = false)
+            final String imageUrl) {
+        final MovieDTO dto = new MovieDTO();
+        dto.setTitle(title);
+        if (genre != null && !genre.isBlank()) {
+            try {
+                dto.setGenre(ar.unrn.video.domain.Genre.valueOf(genre.trim().toUpperCase()));
+            } catch (IllegalArgumentException ignored) {
+                // unknown genre value — leave it null
+            }
+        }
+        if (price != null && !price.isBlank()) {
+            try {
+                dto.setPrice(new java.math.BigDecimal(price.trim()));
+            } catch (NumberFormatException ignored) {
+                // unparseable price — leave it null
+            }
+        }
+        dto.setImageUrl(imageUrl != null && !imageUrl.isBlank() ? imageUrl.trim() : null);
+        return movieService.create(dto);
+    }
+
 }
