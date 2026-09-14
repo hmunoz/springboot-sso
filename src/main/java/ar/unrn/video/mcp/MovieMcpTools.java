@@ -63,7 +63,8 @@ public class MovieMcpTools {
                     readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = false
             ),
             title = "List movies",
-            description = "Lists every movie in the VideoClub catalog, ordered by identifier."
+            description = "Lists every movie in the VideoClub catalog, ordered by identifier. "
+                    + "Each entry includes id, title, genre, rental price and image URL."
     )
     @PreAuthorize("hasAuthority('movie-permission-read')")
     public List<MovieDTO> listMovies() {
@@ -76,7 +77,8 @@ public class MovieMcpTools {
                     readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = false
             ),
             title = "Get movie by id",
-            description = "Returns a single movie by its identifier. Fails when no movie matches the id."
+            description = "Returns a single movie by its identifier, including id, title, genre, "
+                    + "rental price and cover image URL. Fails when no movie matches the id."
     )
     @PreAuthorize("hasAuthority('movie-permission-read')")
     public MovieDTO getMovie(
