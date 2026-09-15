@@ -2,14 +2,17 @@
 
 Backend Spring Boot 4 (Java 25) como **OAuth 2.0 Resource Server**, con Keycloak como servidor de identidad y una SPA React 19 como cliente público.
 
-> 📘 **Guía didáctica completa**: teoría, flujos, diagramas Mermaid y laboratorio paso a paso en [`docs/seguridad-oauth2-openid-connect-keycloak.md`](docs/seguridad-oauth2-openid-connect-keycloak.md).
+> 🧭 **Documentación de Arquitectura Global:** Para la visión integral de la plataforma, topología de servicios, catálogo de ADRs y contratos, consultá [`docs/README.md`](docs/README.md).
+> 📘 **Guía didáctica completa de seguridad**: teoría, flujos, diagramas Mermaid y laboratorio paso a paso en [`docs/seguridad-oauth2-openid-connect-keycloak.md`](docs/seguridad-oauth2-openid-connect-keycloak.md).
 
-Repositorios del taller:
+## Repositorios de la Plataforma
 
-| Componente | Ubicación | Rol |
-| --- | --- | --- |
-| Backend | este repositorio | Resource Server + cliente M2M del Admin API |
-| Frontend | [`../react-sso`](../react-sso) | SPA React 19, cliente público con PKCE |
+| Componente | Repositorio | Rol |
+| :--- | :--- | :--- |
+| **Backend Core** | [hmunoz/springboot-sso](https://github.com/hmunoz/springboot-sso) (este repositorio) | Resource Server OAuth2/OIDC, eventos RabbitMQ, servidor MCP |
+| **Frontend SPA** | [hmunoz/react-sso](https://github.com/hmunoz/react-sso) | SPA React 19 + Vite, cliente público con PKCE |
+| **API Gateway** | [munozhoracio/apigateway](https://github.com/munozhoracio/apigateway) | Spring Cloud Gateway (GraalVM Native), punto único de entrada |
+| **Backend Agente IA** | [munozhoracio/agente-videoclub-sso](https://github.com/munozhoracio/agente-videoclub-sso) | Spring AI, microservicio asistente, cliente MCP con Token Relay |
 
 ---
 
