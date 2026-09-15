@@ -1,0 +1,41 @@
+# Entorno PRODUCTIVO. Se levanta explicitamente con -f y su propio archivo de variables:
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+#
+# Variante con imagen nativa (GraalVM). Mismo archivo, otra etapa del Dockerfile:
+#   BUILD_TARGET=native-runtime IMAGE_SUFFIX=-native \
+#     docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+#
+# Ambas variables tienen default, asi que el comando JVM de arriba sigue igual que antes.
+# IMAGE_SUFFIX evita que la imagen nativa pise el tag de la JVM.
+name: videoclub
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-runtime}
+    image: videoclub-backend:${APP_VERSION:-1.0.0}${IMAGE_SUFFIX:-}
+    container_name: videoclub-backend-prod
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      SPRING_DOCKER_COMPOSE_ENABLED: "false"
+      JDBC_DATABASE_URL: ${JDBC_DATABASE_URL:-jdbc:postgresql://postgresql:5432/video}
+      JDBC_DATABASE_USERNAME: ${JDBC_DATABASE_USERNAME:-postgres}
+      JDBC_DATABASE_PASSWORD: ${JDBC_DATABASE_PASSWORD:-P4ssword!}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbit}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USER: ${RABBITMQ_USER:-rabbitmq}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-rabbitmq}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_DEFAULT_VHOST:-/}
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-keycloak.events}
+      KEYCLOAK_URL: ${KEYCLOAK_URL:-http://keycloak:8080}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-videoclub}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://localhost:9090/realms/videoclub}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/videoclub/protocol/openid-connect/certs}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-videoclub-frontend}
+      KEYCLOAK_BACKEND_CLIENT_ID: ${KEYCLOAK_BACKEND_CLIENT_ID:-videoclub-backend}
+      KEYCLOAK_BACKEND_CLIENT_SECRET: ${KEYCLOAK_BACKEND_CLIENT_SECRET:-dstNSsANvqlaGfZCJa1mcYzP1EBAYP4N}
+    restart: always

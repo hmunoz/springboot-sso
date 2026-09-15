@@ -27,7 +27,7 @@ public class KeycloakAuthInterceptor implements ClientHttpRequestInterceptor {
     private Instant expiresAt = Instant.MIN;
 
     public KeycloakAuthInterceptor(
-            @Value("${keycloak.admin.url:http://localhost:9091}") String url,
+            @Value("${keycloak.admin.url:http://localhost:9090}") String url,
             @Value("${keycloak.admin.realm:videoclub}") String realm,
             @Value("${keycloak.admin.client-id:videoclub-backend}") String clientId,
             @Value("${keycloak.admin.client-secret:dstNSsANvqlaGfZCJa1mcYzP1EBAYP4N}") String clientSecret) {

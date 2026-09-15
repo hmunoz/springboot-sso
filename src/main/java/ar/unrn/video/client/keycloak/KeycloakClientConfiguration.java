@@ -13,7 +13,7 @@ public class KeycloakClientConfiguration {
     @Bean
     public KeycloakAdminClient keycloakAdminClient(
             KeycloakAuthInterceptor authInterceptor,
-            @Value("${keycloak.admin.url:http://localhost:9091}") String adminUrl) {
+            @Value("${keycloak.admin.url:http://localhost:9090}") String adminUrl) {
 
         RestClient restClient = RestClient.builder()
                 .baseUrl(adminUrl)
