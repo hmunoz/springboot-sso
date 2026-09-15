@@ -1,11 +1,16 @@
 name: videoclub
 services:
   gateway:
-    image: registry.gitlab.com/public-unrn/apigateway:1.0
+    image: videoclub-gateway:1.0.0-native
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "9500:9500"
+    environment:
+      # Pinned explicitly instead of relying on Spring's "./config/" default, which resolves
+      # against the image WORKDIR: the buildpack image used /workspace, this native image uses
+      # /app. An absolute location keeps the mount working across either.
+      SPRING_CONFIG_ADDITIONAL_LOCATION: "file:/config/"
     volumes:
-      - ./gateway/gateway.yml:/workspace/config/application.yml:ro
+      - ./gateway/gateway.yml:/config/application.yml:ro
 

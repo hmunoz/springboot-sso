@@ -354,7 +354,7 @@ Decodificando el `access_token` de `usuariocliente` (payload, recortado):
 
 ```json
 {
-  "iss": "http://localhost:9091/realms/videoclub",
+  "iss": "http://localhost:9090/realms/videoclub",
   "sub": "f7c3...",
   "exp": 1725800300,
   "scope": "openid profile email videoclub",
@@ -404,11 +404,11 @@ spring:
     oauth2:
       resource-server:
         jwt:
-          issuer-uri: http://localhost:9091/realms/videoclub
-          jwk-set-uri: http://localhost:9091/realms/videoclub/protocol/openid-connect/certs
+          issuer-uri: http://localhost:9090/realms/videoclub
+          jwk-set-uri: http://localhost:9090/realms/videoclub/protocol/openid-connect/certs
 ```
 
-> El `application.yml` real no hardcodea estas URLs: usa placeholders con valor por defecto, del estilo `${KEYCLOAK_ISSUER_URI:${KEYCLOAK_URL:http://localhost:9091}/realms/${KEYCLOAK_REALM:videoclub}}`. El resultado efectivo en desarrollo es el que se muestra arriba, pero el mismo artefacto se despliega en otros entornos sin recompilar.
+> El `application.yml` real no hardcodea estas URLs: usa placeholders con valor por defecto, del estilo `${KEYCLOAK_ISSUER_URI:${KEYCLOAK_URL:http://localhost:9090}/realms/${KEYCLOAK_REALM:videoclub}}`. El resultado efectivo en desarrollo es el que se muestra arriba, pero el mismo artefacto se despliega en otros entornos sin recompilar.
 
 Con estas dos propiedades, Spring Security descarga las claves públicas del realm una sola vez, las cachea, y a partir de ahí **valida cada token en memoria, sin una sola llamada de red a Keycloak**. Ese es el significado concreto de "stateless".
 
@@ -583,8 +583,8 @@ El backend expone Swagger UI en `http://localhost:8080/swagger-ui/index.html`, c
 ```yaml
 springdoc:
   oauth2:
-    authorization-url: "${KEYCLOAK_URL:http://localhost:9091}/realms/videoclub/protocol/openid-connect/auth"
-    token-url: "${KEYCLOAK_URL:http://localhost:9091}/realms/videoclub/protocol/openid-connect/token"
+    authorization-url: "${KEYCLOAK_URL:http://localhost:9090}/realms/videoclub/protocol/openid-connect/auth"
+    token-url: "${KEYCLOAK_URL:http://localhost:9090}/realms/videoclub/protocol/openid-connect/token"
   swagger-ui:
     oauth:
       client-id: videoclub-frontend
@@ -808,7 +808,7 @@ En `src/config.ts`:
 
 ```typescript
 export const userManager = new UserManager({
-  authority: import.meta.env.VITE_AUTHORITY || 'http://localhost:9091/realms/videoclub',
+  authority: import.meta.env.VITE_AUTHORITY || 'http://localhost:9090/realms/videoclub',
   client_id: import.meta.env.VITE_CLIENT_ID || 'videoclub-frontend',
   redirect_uri: window.location.origin + '/',
   post_logout_redirect_uri: window.location.origin + '/',
@@ -825,7 +825,7 @@ export const userManager = new UserManager({
 El proyecto `react-sso` necesita un archivo `.env` en su raíz:
 
 ```bash
-VITE_AUTHORITY=http://localhost:9091/realms/videoclub
+VITE_AUTHORITY=http://localhost:9090/realms/videoclub
 VITE_CLIENT_ID=videoclub-frontend
 VITE_API_BASE_URL=http://localhost:8080
 ```
@@ -1154,14 +1154,14 @@ Servicios y puertos resultantes:
 
 | Servicio | URL | Para qué |
 | --- | --- | --- |
-| Keycloak | `http://localhost:9091` | Consola de administración y endpoints OIDC |
+| Keycloak | `http://localhost:9090` | Consola de administración y endpoints OIDC |
 | Backend | `http://localhost:8080` | API REST + Swagger UI |
 | Frontend | `http://localhost:5173` | SPA React 19 |
 | MailHog | `http://localhost:8025` | Bandeja de correo de desarrollo |
 | RabbitMQ | `http://localhost:15672` | Consola del broker (eventos de §12) |
 | PostgreSQL | `localhost:5432` | Base de datos de películas |
 
-> **El `--env-file` no es opcional.** `docker/keycloak.yaml` publica `${KEYCLOAK_PORT:-9090}:8080`: el puerto real sale de `docker/.env`, que define `KEYCLOAK_PORT=9091`. Si el archivo de entorno no se carga, Compose usa el fallback **9090** y todo el resto del stack —que apunta a 9091— deja de encontrar a Keycloak. El síntoma es un `401` con *issuer mismatch*, y es la falla número uno del laboratorio.
+> **Sobre `--env-file`.** `docker/keycloak.yaml` publica `${KEYCLOAK_PORT:-9090}:8080` y el puerto real sale de `docker/.env`, que define `KEYCLOAK_PORT=9090`. Ambos valores coinciden, así que si el archivo de entorno no se carga el stack sigue apuntando al mismo lugar. El día que cambies el puerto, cambialo también en `KC_HOSTNAME` (`docker/keycloak.yaml`): si Keycloak se anuncia en un puerto donde no escucha, el síntoma es un `401` con *issuer mismatch*, y es la falla número uno del laboratorio.
 >
 > Compose levanta `docker/.env` de forma automática porque el directorio del proyecto es el del primer archivo `-f`. El `--env-file docker/.env` explícito está en el comando de arriba para que la dependencia sea visible, no porque haga falta.
 

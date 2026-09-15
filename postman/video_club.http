@@ -1,7 +1,7 @@
 # VideoClub con Seguridad
 
 @host = localhost
-@keycloak_port = 9091
+@keycloak_port = 9090
 @backend_port = 8080
 @gateway_port = 9500
 
@@ -9,7 +9,7 @@
 @access_token_api = {{login_api.response.body.access_token}}
 
 # ====================================================================
-# 1. Autenticación (Keycloak :9091)
+# 1. Autenticación (Keycloak :9090)
 # ====================================================================
 
 ###

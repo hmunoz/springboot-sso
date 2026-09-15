@@ -15,28 +15,28 @@ spring:
                 allowCredentials: true
           routes:
             - id: service-catalogo
-              uri: http://host.docker.internal:8080
+              uri: http://backend:8080
               predicates:
                 - Path=/movies/**
               filters:
                 - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
 
             - id: service-socios
-              uri: http://host.docker.internal:8080
+              uri: http://backend:8080
               predicates:
                 - Path=/api/socios/**
               filters:
                 - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
 
             - id: service-users
-              uri: http://host.docker.internal:8080
+              uri: http://backend:8080
               predicates:
                 - Path=/api/users/**
               filters:
                 - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
 
             - id: service-notificaciones
-              uri: http://host.docker.internal:8080
+              uri: http://backend:8080
               predicates:
                 - Path=/api/notifications/**
               filters:

@@ -16,7 +16,7 @@ flowchart TD
     end
 
     subgraph Auth ["Plano de Identidad"]
-        KC["Keycloak (:9091)<br/>Realm videoclub"]
+        KC["Keycloak (:9090)<br/>Realm videoclub"]
     end
 
     subgraph Server ["Spring Boot Resource Server (:8080)"]
@@ -266,7 +266,7 @@ Antigravity no posee un servidor de callbacks OAuth interactivo para conexiones 
         "/home/horacio/proyectos/unrn/taller/springboot-sso/.agents/scripts/mcp-bridge.py"
       ],
       "env": {
-        "KEYCLOAK_URL": "http://localhost:9091",
+        "KEYCLOAK_URL": "http://localhost:9090",
         "KEYCLOAK_REALM": "videoclub",
         "KEYCLOAK_CLIENT_ID": "videoclub-mcp",
         "KEYCLOAK_USER": "usuarioadmin",

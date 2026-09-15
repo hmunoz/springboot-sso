@@ -163,12 +163,12 @@ Configurar el API Gateway como una **fachada orientada a recursos de dominio**:
 Se planteó si Keycloak debía quedar accesible a través del API Gateway (ej. exponiendo `/auth/**` en el puerto `9500`).
 
 #### Decisión
-**NO** colocar Keycloak detrás del API Gateway. Keycloak opera en su propio puerto y autoridad (`:9091`).
+**NO** colocar Keycloak detrás del API Gateway. Keycloak opera en su propio puerto y autoridad (`:9090`).
 
 #### Justificación
 * **Separación de Planos:** Keycloak es la Autoridad de Certificación (Identity Plane). El Gateway gestiona las APIs de negocio (Data Plane).
-* **Validación de Issuer (`iss`):** Keycloak emite JWTs con el claim `iss: http://localhost:9091/realms/videoclub`. Si el cliente negocia el token a través del Gateway, los Resource Servers que validan contra el IdP directo rechazan los tokens con `JwtValidationException: Invalid issuer`, requiriendo complejas reescrituras de cabeceras `X-Forwarded-*`.
-* **Flujo Estándar OAuth2:** La SPA negocia directamente con Keycloak (`:9091`) y luego consume el Gateway (`:9500`) adjuntando el `Bearer token`.
+* **Validación de Issuer (`iss`):** Keycloak emite JWTs con el claim `iss: http://localhost:9090/realms/videoclub`. Si el cliente negocia el token a través del Gateway, los Resource Servers que validan contra el IdP directo rechazan los tokens con `JwtValidationException: Invalid issuer`, requiriendo complejas reescrituras de cabeceras `X-Forwarded-*`.
+* **Flujo Estándar OAuth2:** La SPA negocia directamente con Keycloak (`:9090`) y luego consume el Gateway (`:9500`) adjuntando el `Bearer token`.
 
 #### Consecuencias
 * **Positivas:** Cumplimiento estricto del estándar OIDC y arquitectura limpia sin proxies innecesarios.

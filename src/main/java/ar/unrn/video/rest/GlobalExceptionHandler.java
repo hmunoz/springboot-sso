@@ -1,6 +1,7 @@
 package ar.unrn.video.rest;
 
 import ar.unrn.video.util.NotFoundException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -24,6 +25,7 @@ import java.util.Map;
 /**
  * Standard RFC 7807 Global Exception Handler extending Spring's native ResponseEntityExceptionHandler.
  */
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
@@ -93,6 +95,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleGeneralException(final Exception ex) {
+        log.error("Unhandled exception in REST layer: ", ex);
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "An unexpected internal error occurred"
