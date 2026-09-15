@@ -60,6 +60,15 @@ Compilación completa de los 12 ADRs del sistema, detallando el contexto, opcion
 
 ---
 
+### 7. [CORS: configuración, capas y diagnóstico](CORS.md)
+* Qué capa decide CORS en cada tramo: Keycloak (`webOrigins`), Gateway (`globalcors`) y backend (`corsConfigurationSource`).
+* Anatomía del **preflight** `OPTIONS` y por qué un `401` en el preflight se reporta como error de CORS.
+* Errores reales ya corregidos en el repositorio: `addMapping()` con un origen en lugar de un path, dos configuraciones compitiendo, orígenes con path y `"/*"` como comodín inválido de Keycloak.
+* La incompatibilidad entre `allowedOrigins("*")` y `allowCredentials(true)`, y el uso de `allowedOriginPatterns`.
+* Árbol de diagnóstico y verificación con `curl`, incluyendo la detección de cabeceras duplicadas.
+
+---
+
 ## 🛠️ Servicios de Infraestructura (Docker Compose)
 
 El entorno se administra de forma orquestada mediante `docker/services.yaml`:
@@ -71,7 +80,7 @@ docker compose -f docker/services.yaml up -d
 | Servicio | Contenedor | Puerto Local | Descripción |
 | :--- | :--- | :--- | :--- |
 | **PostgreSQL** | `video-postgresql` | `5432` | Base de datos relacional de la aplicación (`video`). |
-| **Keycloak** | `video-keycloak` | `9091` | Identity Provider OAuth2/OIDC con Realm `videoclub`. |
+| **Keycloak** | `video-keycloak` | `9090` | Identity Provider OAuth2/OIDC con Realm `videoclub`. |
 | **RabbitMQ** | `video-rabbit` | `5672` / `15672` | Broker AMQP con consola de administración. |
 | **API Gateway** | `videoclub-gateway-1` | `9500` | Spring Cloud Gateway (fachada de microservicios). |
 | **Mailhog** | `mailhog` | `1025` / `8025` | Servidor SMTP simulado con interfaz web para emails. |

@@ -11,7 +11,7 @@ El API Gateway actúa como el **punto único de entrada (Single Point of Entry)*
 ```mermaid
 flowchart TD
     SPA["Frontend SPA (React)<br/>http://localhost:5173"]
-    KC["Keycloak (IdP / Autoridad)<br/>http://localhost:9091"]
+    KC["Keycloak (IdP / Autoridad)<br/>http://localhost:9090"]
     GW["Spring Cloud Gateway<br/>http://localhost:9500"]
     BE["Backend / Monolito Modular<br/>http://localhost:8080"]
     S_SOCIOS["Microservicio Socios (Futuro)<br/>http://localhost:8082"]
@@ -49,10 +49,10 @@ flowchart TD
 ### ADR 2: Separación del Plano de Identidad (Keycloak fuera del Gateway)
 
 * **Pregunta:** *¿Debería enrutarse Keycloak a través del API Gateway (ej. `/auth/**`)?*
-* **Decisión:** **NO**. Keycloak debe mantenerse en su propio puerto y endpoint de autoridad (`:9091`).
+* **Decisión:** **NO**. Keycloak debe mantenerse en su propio puerto y endpoint de autoridad (`:9090`).
 * **Justificación Técnica:**
   1. **Separación de Planos:** Keycloak opera en el **Identity Control Plane** (emisión de tokens, flujos OIDC, consentimiento). El Gateway opera en el **Data Plane** (orquestación y ruteo de peticiones de negocio).
-  2. **Validación del Claim `iss` (Issuer):** Según la especificación OpenID Connect Core 1.0, los tokens JWT contienen el claim obligatorio `iss` (ej. `http://localhost:9091/realms/videoclub`). Los Resource Servers (Spring Boot) validan que el `iss` coincida exactamente con el emisor configurado en `spring.security.oauth2.resourceserver.jwt.issuer-uri`. Si las peticiones pasan por el Gateway bajo otra URL, se producen discrepancias que provocan `JwtValidationException: Invalid issuer`.
+  2. **Validación del Claim `iss` (Issuer):** Según la especificación OpenID Connect Core 1.0, los tokens JWT contienen el claim obligatorio `iss` (ej. `http://localhost:9090/realms/videoclub`). Los Resource Servers (Spring Boot) validan que el `iss` coincida exactamente con el emisor configurado en `spring.security.oauth2.resourceserver.jwt.issuer-uri`. Si las peticiones pasan por el Gateway bajo otra URL, se producen discrepancias que provocan `JwtValidationException: Invalid issuer`.
   3. **Flujo Canónico OAuth2/OIDC:**
      * El navegador interactúa directamente con Keycloak para login, redirecciones y refresh tokens.
      * El navegador adjunta el `access_token` resultante en el header `Authorization: Bearer <token>` hacia el Gateway.
@@ -62,13 +62,13 @@ sequenceDiagram
     autonumber
     actor User as Usuario / Browser
     participant SPA as React SPA (:5173)
-    participant KC as Keycloak (:9091)
+    participant KC as Keycloak (:9090)
     participant GW as API Gateway (:9500)
     participant BE as Backend Resource Server (:8080)
 
     User->>SPA: Accede a la aplicación
     SPA->>KC: Redirección OAuth2 / Token request
-    KC-->>SPA: Retorna JWT (iss: http://localhost:9091/...)
+    KC-->>SPA: Retorna JWT (iss: http://localhost:9090/...)
     Note over SPA,GW: El frontend solo usa el Gateway para llamadas de negocio
     SPA->>GW: GET /movies (Header: Bearer JWT)
     GW->>BE: Proxy inverso a http://host.docker.internal:8080/movies

@@ -54,7 +54,7 @@ npm run dev
 Necesita un `.env` propio en su raíz:
 
 ```bash
-VITE_AUTHORITY=http://localhost:9091/realms/videoclub
+VITE_AUTHORITY=http://localhost:9090/realms/videoclub
 VITE_CLIENT_ID=videoclub-frontend
 VITE_API_BASE_URL=http://localhost:8080
 ```
@@ -66,13 +66,13 @@ VITE_API_BASE_URL=http://localhost:8080
 | Frontend (SPA) | http://localhost:5173 | React 19 + Vite |
 | Backend | http://localhost:8080 | API REST |
 | Swagger UI | http://localhost:8080/swagger-ui/index.html | Con login OAuth2 + PKCE |
-| Keycloak | http://localhost:9091 | Consola: `/admin/master/console/#/realms/videoclub` |
-| API Gateway | http://localhost:9500 | Ruta `/catalogo/**` → backend |
+| Keycloak | http://localhost:9090 | Consola: `/admin/master/console/#/realms/videoclub` |
+| API Gateway | http://localhost:9500 | `/movies/**`, `/api/socios/**`, `/api/users/**`, `/api/notifications/**` → backend; `/api/agent/**` → agent |
 | RabbitMQ | http://localhost:15672 | Consola del broker |
 | MailHog | http://localhost:8025 | Bandeja de correo de desarrollo |
 | PostgreSQL | localhost:5432 | Base de películas |
 
-> **El puerto de Keycloak sale de `docker/.env` (`KEYCLOAK_PORT=9091`).** El fallback de `docker/keycloak.yaml` es 9090: si el archivo de entorno no se carga, Keycloak queda en un puerto que ningún otro componente conoce y todo falla con `401` / *issuer mismatch*.
+> **El puerto de Keycloak sale de `docker/.env` (`KEYCLOAK_PORT=9090`).** Todos los valores por defecto están alineados a 9090 (`KC_HOSTNAME` y `ports` en `docker/keycloak.yaml`, `issuer-uri` y `jwk-set-uri` en `src/main/resources/application.yml`), así que si el archivo de entorno no se carga el stack sigue siendo coherente. Si cambiás el puerto, cambialo en los dos lugares: un `KC_HOSTNAME` que no coincida con el puerto publicado deja a Keycloak anunciándose donde no escucha, y todo falla con `401` / *issuer mismatch*.
 
 ---
 
@@ -96,7 +96,7 @@ La colección lista para ejecutar está en [`postman/VideoClub con Seguridad.htt
 ### Token de usuario (Resource Owner Password — solo para debugging)
 
 ```bash
-curl --request POST 'http://localhost:9091/realms/videoclub/protocol/openid-connect/token' \
+curl --request POST 'http://localhost:9090/realms/videoclub/protocol/openid-connect/token' \
   --header 'Content-Type: application/x-www-form-urlencoded' \
   --data-urlencode 'client_id=videoclub-frontend' \
   --data-urlencode 'username=usuarioadmin' \
@@ -114,7 +114,7 @@ curl --request POST 'http://localhost:9091/realms/videoclub/protocol/openid-conn
 Es el que el backend usa internamente para hablar con el Admin API de Keycloak:
 
 ```bash
-curl --request POST 'http://localhost:9091/realms/videoclub/protocol/openid-connect/token' \
+curl --request POST 'http://localhost:9090/realms/videoclub/protocol/openid-connect/token' \
   --header 'Content-Type: application/x-www-form-urlencoded' \
   --data-urlencode 'client_id=videoclub-backend' \
   --data-urlencode 'client_secret=dstNSsANvqlaGfZCJa1mcYzP1EBAYP4N' \
@@ -154,7 +154,7 @@ curl --location 'http://localhost:8080/api/users' \
 
 ## Keycloak: realm, clientes, grupos y roles
 
-Consola de administración: http://localhost:9091/admin/master/console/#/realms/videoclub
+Consola de administración: http://localhost:9090/admin/master/console/#/realms/videoclub
 
 | Cliente | Tipo | Flujo | Usado por |
 | --- | --- | --- | --- |
