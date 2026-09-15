@@ -58,11 +58,17 @@ public class MovieService {
     private MovieDTO mapToDTO(final Movie movie, final MovieDTO movieDTO) {
         movieDTO.setId(movie.getId());
         movieDTO.setTitle(movie.getTitle());
+        movieDTO.setGenre(movie.getGenre());
+        movieDTO.setPrice(movie.getPrice());
+        movieDTO.setImageUrl(movie.getImageUrl());
         return movieDTO;
     }
 
     private Movie mapToEntity(final MovieDTO movieDTO, final Movie movie) {
         movie.setTitle(movieDTO.getTitle());
+        movie.setGenre(movieDTO.getGenre());
+        movie.setPrice(movieDTO.getPrice());
+        movie.setImageUrl(movieDTO.getImageUrl());
         return movie;
     }
 
