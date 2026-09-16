@@ -2,32 +2,79 @@
 #
 # `name: videoclub` une este stack a la red existente `videoclub_default`
 # creada por `docker/services.yaml`.
-# De esta manera, el backend comparte red con Keycloak, Postgres, RabbitMQ, Gateway, etc.
+# De esta manera, los servicios comparten red con Keycloak, Postgres, RabbitMQ, Gateway, etc.
+#
+# Desde la separacion en dos servicios (ver docs/arquitectura-dos-servicios.md) este archivo levanta
+# LOS DOS SIEMPRE (decision D4): el gateway rutea de verdad y el entorno de desarrollo se
+# parece a produccion. El costo es el doble de RAM y de tiempo de arranque.
+#
+# IMPORTANTE - los nombres de servicio son `catalog` y `membership`, sin sufijo:
+# la clave del servicio es el hostname DNS dentro de la red de Docker, y es la que usan
+# el gateway (http://catalog:8081) y el agente (http://catalog:8081/mcp). Si cambia aca,
+# hay que cambiarla tambien en docker/gateway/gateway.yml y en los compose del agente.
+# El sufijo -dev queda solo en container_name, que no participa del DNS.
 name: videoclub
 
 services:
-  backend:
+  catalog:
     build:
-      context: .
+      context: ./catalog-service
       dockerfile: Dockerfile
       # Clavado, no parametrizado: las lineas de abajo (bind mount y
       # command: mvn spring-boot:run) solo funcionan sobre la etapa dev.
       target: dev
-    container_name: videoclub-backend-dev
+    container_name: videoclub-catalog-dev
     volumes:
-      # Bind mount para reflejar cambios de codigo en vivo
-      - .:/app
+      # Bind mount para reflejar cambios de codigo en vivo. Solo esta carpeta:
+      # catalog-service es un proyecto Maven completo por si mismo.
+      - ./catalog-service:/app
       # Volumen de host para no redescargar dependencias de Maven en cada inicio
       - ~/.m2:/root/.m2
     command: mvn spring-boot:run
     ports:
-      - "${SERVER_PORT:-8080}:${SERVER_PORT:-8080}"
+      - "${CATALOG_SERVER_PORT:-8081}:${CATALOG_SERVER_PORT:-8081}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      SERVER_PORT: ${SERVER_PORT:-8080}
+      SERVER_PORT: ${CATALOG_SERVER_PORT:-8081}
       SPRING_DOCKER_COMPOSE_ENABLED: "false"
-      JDBC_DATABASE_URL: ${JDBC_DATABASE_URL:-jdbc:postgresql://postgresql:5432/video}
+      JDBC_DATABASE_URL: ${CATALOG_JDBC_DATABASE_URL:-jdbc:postgresql://postgresql:5432/video_catalog}
+      JDBC_DATABASE_USERNAME: ${JDBC_DATABASE_USERNAME:-postgres}
+      JDBC_DATABASE_PASSWORD: ${JDBC_DATABASE_PASSWORD:-P4ssword!}
+      # Conexion a RabbitMQ preconfigurada (D6). Catalogo todavia no publica ni consume,
+      # pero el starter esta en el classpath y las variables ya estan listas.
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbit}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USER: ${RABBITMQ_USER:-rabbitmq}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-rabbitmq}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_DEFAULT_VHOST:-/}
+      # Solo validacion de tokens: catalogo no llama a la Admin REST API de Keycloak,
+      # asi que NO recibe KEYCLOAK_BACKEND_CLIENT_SECRET (ver decision D5 y trampa C7).
+      KEYCLOAK_URL: ${KEYCLOAK_URL:-http://keycloak:8080}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-videoclub}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://localhost:9090/realms/videoclub}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/videoclub/protocol/openid-connect/certs}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-videoclub-frontend}
+      MCP_RESOURCE_URI: ${CATALOG_MCP_RESOURCE_URI:-http://localhost:8081/mcp}
+
+  membership:
+    build:
+      context: ./membership-service
+      dockerfile: Dockerfile
+      target: dev
+    container_name: videoclub-membership-dev
+    volumes:
+      - ./membership-service:/app
+      - ~/.m2:/root/.m2
+    command: mvn spring-boot:run
+    ports:
+      - "${MEMBERSHIP_SERVER_PORT:-8082}:${MEMBERSHIP_SERVER_PORT:-8082}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      SERVER_PORT: ${MEMBERSHIP_SERVER_PORT:-8082}
+      SPRING_DOCKER_COMPOSE_ENABLED: "false"
+      JDBC_DATABASE_URL: ${MEMBERSHIP_JDBC_DATABASE_URL:-jdbc:postgresql://postgresql:5432/video_membership}
       JDBC_DATABASE_USERNAME: ${JDBC_DATABASE_USERNAME:-postgres}
       JDBC_DATABASE_PASSWORD: ${JDBC_DATABASE_PASSWORD:-P4ssword!}
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbit}
@@ -41,5 +88,7 @@ services:
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://localhost:9090/realms/videoclub}
       KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/videoclub/protocol/openid-connect/certs}
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-videoclub-frontend}
+      # Unico servicio que habla con la Admin REST API de Keycloak.
       KEYCLOAK_BACKEND_CLIENT_ID: ${KEYCLOAK_BACKEND_CLIENT_ID:-videoclub-backend}
-      KEYCLOAK_BACKEND_CLIENT_SECRET: ${KEYCLOAK_BACKEND_CLIENT_SECRET:-dstNSsANvqlaGfZCJa1mcYzP1EBAYP4N}
+      KEYCLOAK_BACKEND_CLIENT_SECRET: ${KEYCLOAK_BACKEND_CLIENT_SECRET:?falta KEYCLOAK_BACKEND_CLIENT_SECRET en el archivo .env}
+      MCP_RESOURCE_URI: ${MEMBERSHIP_MCP_RESOURCE_URI:-http://localhost:8082/mcp}
