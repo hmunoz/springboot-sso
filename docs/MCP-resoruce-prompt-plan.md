@@ -173,14 +173,17 @@ Inyectar `catalog://genres` en el system prompt del sub-agente de catálogo, en 
 
 ## 6. Hints nativos (GraalVM)
 
-### [MODIFY] `NativeRuntimeHints.java` de ambos servicios
+### Sin cambios en `NativeRuntimeHints.java`
 
-Los nuevos `@Component` de recursos y prompts se descubren por reflexión y devuelven tipos del SDK de MCP (`GetPromptResult`, `PromptMessage`) que Jackson serializa.
+> [!IMPORTANT]
+> **Corrección sobre la versión anterior de este plan.** Proponía registrar a mano los hints de los nuevos `@Component`. **No hace falta, y agregarlos sería ruido.** Spring AI ya los registra: `McpServerAnnotationScannerAutoConfiguration` incluye un procesador AOT que escanea los beans anotados con `@McpTool`, `@McpResource`, `@McpPrompt` y `@McpComplete`, y registra **todos sus miembros** para reflexión.
+>
+> Es la misma razón por la que `MovieMcpTools` nunca necesitó un hint propio y funcionó en nativo desde el primer día. El hint que sí hizo falta, el de `MovieTitleUniqueValidator`, era para una clase que **no** tiene ninguna de esas anotaciones y que Spring construye por fuera del grafo de beans.
 
 > [!WARNING]
-> **Ningún test en JVM puede fallar por un hint faltante.** Ya nos pasó con `MovieTitleUniqueValidator`: `./mvnw test` en verde, contenedor `healthy`, y `500` en la primera llamada real sobre imagen nativa.
+> **Que el AOT de Spring AI cubra los beans no reemplaza probar en nativo.** Ningún test en JVM puede fallar por un hint faltante: ya nos pasó con `MovieTitleUniqueValidator`, con `./mvnw test` en verde, contenedor `healthy` y `500` en la primera llamada real. La verificación nativa de la sección 9 sigue siendo obligatoria.
 >
-> El patrón a seguir está en `catalog-service/src/test/java/ar/unrn/video/catalog/NativeRuntimeHintsTest.java`: afirmar los hints con `RuntimeHintsPredicates` en el test normal. Eso mueve el diagnóstico de un build nativo de varios minutos a un `mvnw test` de segundos. **Escribir ese test antes que el hint**, y verificar que falla sin él.
+> **La regla para decidir si una clase necesita hint propio:** si lleva una anotación MCP, la cubre Spring AI. Si Spring la instancia por reflexión fuera del grafo normal —un `ConstraintValidator`, un converter armado a mano—, necesita hint y test con `RuntimeHintsPredicates`, siguiendo `NativeRuntimeHintsTest`.
 
 ---
 
@@ -203,9 +206,38 @@ Un Resource se inyecta como contexto **antes** de que el modelo razone, así que
 > [!CAUTION]
 > **Las authorities de este realm son de grano fino y no hay roles de realm.** El realm `videoclub` define `movie-permission-read/create/update/delete`, `socio-permission-read` y `user-permission-read/create` como *client roles* de `videoclub-frontend`. **No existen `ROLE_USER`, `ROLE_ADMIN` ni `SCOPE_read`**, y además `GrantedAuthorityDefaults("")` elimina el prefijo `ROLE_`. Un `hasAnyAuthority('ROLE_USER', ...)` deniega al 100% de los usuarios.
 
-### R4. `uri` es un template, y el parámetro se liga por posición
+### R4. Las variables de la URI se ligan por posición, no por nombre
 
-`catalog://movies/{id}` liga `{id}` al parámetro del método. Un nombre que no coincida no rompe la compilación: falla al resolver, en runtime.
+Verificado en `AbstractMcpResourceMethodCallback`: las variables de `catalog://movies/{id}` se asignan **en el orden del template** a los parámetros del método que no son especiales. El nombre del parámetro es irrelevante. Tres reglas se validan **al arrancar**, y un error ahí tumba el contexto con un mensaje explícito:
+
+* cada variable necesita un parámetro;
+* esos parámetros tienen que ser `String`;
+* la cantidad tiene que coincidir.
+
+**La trampa silenciosa es otra:** con dos o más variables, `catalog://{a}/{b}` ligado a `(String b, String a)` arranca sin error y **cruza los valores en runtime**. Con una sola variable no hay ambigüedad posible.
+
+### R5. Recurso fijo y plantilla son primitivas distintas
+
+`catalog://genres` se registra como **recurso**; `catalog://movies/{id}`, que tiene una variable, como **plantilla de recurso**. MCP las lista por separado (`resources/list` y `resources/templates/list`), y `SyncMcpAnnotationProviders` también: `statelessResourceSpecifications` para las fijas y `statelessResourceTemplateSpecifications` para las plantillas.
+
+**Falla silenciosa:** un test de descubrimiento que solo consulte la lista de recursos fijos no ve ninguna plantilla y pasa igual si la plantilla desaparece.
+
+### R6. Dos servidores con la misma tool: el cliente renombra en vez de fallar
+
+Verificado en `spring-ai-mcp-2.0.1`. El builder de `SyncMcpToolCallbackProvider` usa por defecto `DefaultMcpToolNamePrefixGenerator`, y cuando un nombre de tool ya existe lo **renombra** en lugar de rechazarlo:
+
+```java
+if (!this.allUsedToolNames.add(uniqueToolName)) {
+    uniqueToolName = "alt_" + this.counter.getAndIncrement() + "_" + uniqueToolName;
+    logger.warn("Tool name '" + tool.name() + "' already exists. ...");
+}
+```
+
+El agente usa ese generador sin haberlo elegido: `McpClientConfiguration` no configura ninguno.
+
+**Falla silenciosa:** el nombre resultante (`alt_0_search`) no tiene significado para el modelo, depende del orden en que se descubrieron los servidores, y rompe cualquier filtro por nombre. Si un sub-agente trabajara con dos servidores, `AbstractDomainSubAgent` buscaría `search`, encontraría `alt_0_search` y la descartaría sin error.
+
+**Por qué hoy no ocurre:** las tools llevan el dominio en el nombre (`list_movies`, `list_socios`) y cada sub-agente usa un provider de un solo servidor. Es una convención, no una garantía. Ver la tarea pendiente [T1](#t1-hacer-explícita-la-política-de-nombres-de-tools).
 
 ---
 
@@ -219,6 +251,7 @@ Lo que hace a este plan una **base** y no un ejercicio cerrado:
 | Estados de socio más allá de `activo` | `membership://tiers` con los valores reales del enum, igual que `catalog://genres` hoy |
 | Reglas de sanción por demora | Prompt `membership-debt-triage` con el procedimiento que el dominio implemente |
 | Campos nuevos en `Movie` (año, sinopsis, director) | La ficha de `catalog://movies/{id}` los suma sin cambiar su firma |
+| **Un microservicio nuevo con sus propias tools** | Nombrar las tools con su dominio y resolver antes la tarea pendiente [T1](#t1-hacer-explícita-la-política-de-nombres-de-tools): es el caso en que una colisión de nombres deja de ser teórica |
 
 **La regla que conviene sostener:** un recurso nace cuando existe el dato, no antes. Mientras tanto, el patrón queda demostrado con `catalog://genres`, que es pequeño, verdadero y suficiente para explicar la primitiva.
 
@@ -228,9 +261,9 @@ Lo que hace a este plan una **base** y no un ejercicio cerrado:
 
 ### Tests automatizados
 
-1. **Descubrimiento** (`catalog-service` y `membership-service`): que los providers encuentren los recursos y prompts esperados a través del camino real —`SyncMcpAnnotationProviders`— y no del API público proxy-blind. Espejo de `McpToolsSecurityTest#everyToolIsDiscoverable`.
+1. **Descubrimiento** (`catalog-service` y `membership-service`): que los providers encuentren los recursos, las plantillas y los prompts esperados a través del camino real —`SyncMcpAnnotationProviders`— y no del API público proxy-blind. Recursos fijos y plantillas se afirman **por separado** (ver [R5](#r5-recurso-fijo-y-plantilla-son-primitivas-distintas)). Espejo de `McpToolsSecurityTest#everyToolIsDiscoverable`.
 2. **Autorización**: cada recurso denegado sin la authority correspondiente y permitido con ella, más `AuthenticationCredentialsNotFoundException` con contexto vacío. Espejo de los casos que ya existen para tools.
-3. **Hints nativos**: extender `NativeRuntimeHintsTest` con los tipos nuevos. Verificar que falla al quitar el hint.
+3. **Hints nativos**: ninguno propio (ver sección 6). La cobertura nativa se comprueba con el build nativo de la verificación manual, no con un test en JVM.
 4. **Agente**: `McpKnowledgeServiceTest` — ruteo por scheme, y que un scheme desconocido lance en vez de elegir un cliente.
 
 ### Verificación manual
@@ -248,3 +281,111 @@ curl -H "Authorization: Bearer $TOKEN" \
 2. **Autorización real:** con el token de `usuariocliente` (que no tiene `socio-permission-read`), `membership://socios/{id}` debe dar `403`, no una ficha.
 3. **Prueba conversacional:** preguntar por una película de un género y verificar en el `ExecutionTracker` que el género usado es una constante válida del enum.
 4. **En imagen nativa:** repetir 1–3 sobre `BUILD_TARGET=native-runtime`. **Es el único modo que puede revelar un hint faltante.**
+
+---
+
+## 10. Tareas pendientes
+
+### T1. Hacer explícita la política de nombres de tools
+
+**Estado:** pendiente. Surge de la revisión de un artículo externo sobre Spring AI MCP, contrastado contra el código fuente de `spring-ai-mcp-2.0.1`.
+
+#### Qué hay que hacer
+
+1. En `videoclub-agent/.../config/McpClientConfiguration.java`, configurar explícitamente los tres `SyncMcpToolCallbackProvider` (`catalogTools`, `membershipTools` y el `@Primary` agregado) con:
+
+   ```java
+   SyncMcpToolCallbackProvider.builder()
+           .mcpClients(catalogMcpClient)
+           .toolNamePrefixGenerator(McpToolNamePrefixGenerator.noPrefix())
+           .build();
+   ```
+
+2. Documentar como convención del proyecto que **toda tool lleva su dominio en el nombre** (`list_movies`, `get_socio`), y no un nombre genérico (`list`, `search`, `get_by_id`).
+
+3. Agregar un test que construya un provider sobre dos clientes simulados que exponen el mismo nombre y verifique que `getToolCallbacks()` lanza `IllegalStateException`.
+
+#### Qué aporta
+
+**Convierte una falla silenciosa en una falla visible**, que es la misma filosofía que ya sigue `AbstractDomainSubAgent` cuando un sub-agente se queda sin tools. Con `noPrefix()`, dos tools con el mismo nombre no se renombran: llegan a la validación de `SyncMcpToolCallbackProvider`, que lanza `IllegalStateException("Multiple tools with the same name (...)")` en el primer descubrimiento.
+
+Eso importa por el propósito de este proyecto. Hoy son dos servicios y la colisión es teórica. Cuando se sumen servicios nuevos, el error aparece durante el desarrollo de quien introdujo el nombre repetido, y no semanas después como una tool que el agente dejó de encontrar sin ningún error en el log.
+
+**Hace visible una decisión que hoy es implícita.** El proyecto depende de que los nombres no colisionen, pero en ningún lado está escrito. Configurar el generador a mano deja la política en el código, donde la ve quien lo lee.
+
+#### Costo aceptado
+
+Con `noPrefix()`, una colisión en el provider agregado hace fallar `GET /api/agent/tools` en lugar de listar la tool como `alt_0_...`. Se prefiere así: un listado que falla avisa del problema; uno que muestra un nombre inventado lo esconde.
+
+> [!WARNING]
+> **Si en esta tarea se usa también `toolFilter`, atención a la firma.** En Spring AI 2.0.1, `McpToolFilter` es `BiPredicate<McpConnectionInfo, McpSchema.Tool>`: el segundo parámetro es el objeto `Tool`, no su nombre. Un filtro escrito como `(server, toolName) -> Set.of("x").contains(toolName)` **compila**, porque `Set.contains` acepta cualquier `Object`, pero devuelve siempre `false`: el cliente se queda sin ninguna tool y no hay error. Se comprobó compilando y ejecutando ese código contra 2.0.1. La forma correcta es `(info, tool) -> Set.of("x").contains(tool.name())`.
+
+### T2. Clasificar los errores MCP con una sola regla y devolver el código HTTP que corresponde
+
+**Estado:** pendiente, con prioridad baja. Surge de la prueba de punta a punta sobre imágenes nativas. Tiene dos partes de urgencia distinta.
+
+#### El problema
+
+**Parte A — afecta al chat, que es lo que usan los usuarios.** `TrackingToolCallback` (líneas 60-64) decide que una tool fue **denegada** buscando texto en el mensaje de error:
+
+```java
+msg.contains("Access Denied")
+|| msg.contains("AccessDeniedException")
+|| msg.contains("403")                       // demasiado amplio
+|| msg.contains("Forbidden")
+|| msg.toLowerCase().contains("denied")      // demasiado amplio
+|| msg.toLowerCase().contains("permis")      // demasiado amplio
+```
+
+`"No movie found with id 14030"` contiene `"403"`, así que un "no existe" se registra en `toolsDenied` y **el frontend lo muestra como una tool denegada**. Hace falta que el número coincida, pero cuando pasa el usuario ve un motivo falso.
+
+**Parte B — solo afecta a un endpoint de diagnóstico.** `GET /api/agent/resources/content` convierte cualquier error MCP en un `500` genérico y descarta el mensaje del servidor. Verificado en vivo:
+
+| Caso | Hoy | Debería ser | Mensaje que el servicio generó y se pierde |
+| :--- | :--- | :--- | :--- |
+| Sin permiso | `500` | `403` | `Access Denied` |
+| ID no numérico | `500` | `400` | `Invalid movie id: abc` |
+| ID inexistente | `500` | `404` | `No movie found with id 999999` |
+
+La parte B no se ve desde la UI: el frontend no usa ese endpoint. Por eso su prioridad es baja.
+
+#### Qué hay que hacer
+
+1. **Un clasificador compartido** en `videoclub-agent`, con una sola responsabilidad: recibir la excepción de una llamada MCP y decir qué pasó.
+
+   ```java
+   enum McpFailure { DENIED, NOT_FOUND, INVALID_INPUT, UNKNOWN }
+   record ClassifiedMcpError(McpFailure kind, String serverMessage) {}
+   ```
+
+   `TrackingToolCallback` y `AgentController` lo usan los dos, así tools y recursos deciden con **la misma** regla.
+
+2. **Ajustar la detección de denegación** para que busque la frase `Access Denied` o el nombre `AccessDeniedException`, y no números sueltos ni fragmentos de palabras.
+
+3. **Expresar "no existe" con un código, no con texto.** Verificado en `SyncStatelessMcpResourceMethodCallback`: si el propio método lanza un `McpError`, Spring AI lo deja pasar intacto.
+
+   ```java
+   if (e instanceof McpError mcpError && mcpError.getJsonRpcError() != null) {
+       throw mcpError;                                    // pasa con su código
+   }
+   throw McpError.builder(ErrorCodes.INVALID_PARAMS)     // todo lo demás termina en -32602
+   ```
+
+   El SDK define `ErrorCodes.RESOURCE_NOT_FOUND = -32002`, que es el código que establece MCP. Los recursos de `catalog-service` y `membership-service` pueden lanzarlo, y el agente decide por el número, no por cómo está redactado el mensaje.
+
+4. **En `readResourceContent`, traducir a HTTP** (`403`, `404`, `400`) y devolver el mensaje del servidor en esos tres casos. El `500` para lo desconocido mantiene el mensaje genérico, para no exponer detalles internos.
+
+#### Límites que hay que respetar
+
+* **La denegación nunca puede llegar como código.** `@PreAuthorize` rechaza **antes** de que corra el método, así que el servicio no tiene oportunidad de traducirla. Para ese caso buscar el texto es inevitable, y por eso la regla del punto 2 tiene que ser precisa.
+* **`-32602` no alcanza para "entrada inválida".** Es el código que Spring AI le pone a **todo** lo que envuelve, incluida una base de datos caída. Mapear "todo `-32602` a `400`" haría que una caída de PostgreSQL se viera como un error del cliente.
+
+#### Qué aporta
+
+* **El chat deja de mostrar motivos falsos.** Una tool que no encontró datos no aparece como denegada.
+* **Los mensajes accionables llegan hasta quien los necesita.** Los servicios ya los generan con cuidado (`McpToolsNotFoundTest` existe justamente para eso), y hoy se pierden en la última capa.
+* **Cada servicio nuevo hereda un contrato de códigos**, en lugar de tener que copiar exactamente la redacción de un mensaje para que el agente lo entienda.
+
+> [!NOTE]
+> **Responder `403` o `404` no permite adivinar qué IDs existen.** Como `@PreAuthorize` corre antes de buscar el registro, quien no tiene permiso recibe `403` siempre, exista o no el ID. La diferencia entre `403` y `404` solo la ve quien sí está autorizado.
+
