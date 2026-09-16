@@ -138,33 +138,34 @@ Ese conocimiento hoy no está escrito en ningún lado que el agente pueda leer, 
 
 ### [NEW] `McpKnowledgeService.java`
 
-Fachada sobre los dos `McpSyncClient` que ya existen. Rutea por el *scheme* de la URI: `catalog://` al cliente de catálogo, `membership://` al de membresía.
+Fachada sobre los dos `McpSyncClient` que ya existen. Rutea la lectura de un recurso por el *scheme* de la URI: `catalog://` al cliente de catálogo, `membership://` al de membresía.
 
 ```java
-String readResource(String uri);                                   // rutea por scheme
-GetPromptResult getPrompt(String name, Map<String, Object> args);  // rutea por servidor
-List<Resource> listResources();                                    // introspección
+String readResource(String uri);   // rutea por scheme
 ```
+
+Su único consumidor es `CatalogSubAgent`, que lee `catalog://genres` para enriquecer su system prompt.
 
 > [!IMPORTANT]
 > **Un scheme desconocido tiene que fallar fuerte, no elegir un cliente por descarte.** Es la misma lógica del fail-fast de `AbstractDomainSubAgent`: si mandás una URI mal escrita al servidor equivocado, el error que vuelve es "recurso no encontrado" y parece un problema de datos cuando en realidad es de ruteo.
 
-### [MODIFY] `agent/rest/AgentController.java`
+### Sin endpoints de introspección en el agente
 
-*(Nota: el controller está en `agent/rest/`, no en `agent/controller/`.)*
-
-Endpoints de introspección, hermanos del `GET /api/agent/tools` que ya existe:
-
-* `GET /api/agent/resources`
-* `GET /api/agent/prompts`
-* `GET /api/agent/resources/content?uri={uri}`
+> [!IMPORTANT]
+> **Decisión posterior a la implementación.** Una primera versión agregó a `AgentController` tres endpoints —`GET /api/agent/resources`, `GET /api/agent/prompts` y `GET /api/agent/resources/content?uri=`— junto con los métodos de listado y `getPrompt` en `McpKnowledgeService`. **Se eliminaron** porque:
+>
+> * **No tenían consumidor.** Ni el frontend, ni las colecciones `.http`, ni Postman, ni la documentación los usaban. `getPrompt` directamente no lo llamaba nadie. `GET /api/agent/tools` sí se conserva: lo usa el indicador de tools del frontend.
+> * **`/resources/content?uri=` era un proxy genérico** hacia cualquier recurso MCP. No filtraba datos, porque el Token Relay mantiene la identidad del usuario, pero era superficie expuesta sin motivo, y además convertía todos los errores en un `500` genérico.
+> * **Para explorar recursos y prompts ya existe la herramienta estándar:** MCP Inspector, conectado directamente a cada servicio. El client `videoclub-mcp` del realm ya tiene como redirect `http://localhost:6274/*`, el puerto por defecto del Inspector. Consultar el servidor directamente, y no a través del agente, además muestra la primitiva donde vive.
+>
+> Queda como criterio para el proyecto: **no exponer endpoints "por las dudas".** Un endpoint nace cuando tiene quien lo use.
 
 > [!NOTE]
-> Estos endpoints hacen una llamada **viva** a los servidores MCP, igual que `getAvailableToolNames()`. Si un backend está caído, devuelven error — y eso está bien. El frontend debe mostrar ese fallo, no un conteo viejo: es la misma lección del indicador de tools.
+> **Los prompts MCP los exponen los servicios, pero hoy el agente no los consume.** Están disponibles para cualquier cliente MCP —MCP Inspector, Claude Code— y para un uso futuro dentro del agente.
 
-### [MODIFY] `CatalogSubAgent.java` y `MembershipSubAgent.java`
+### [MODIFY] `CatalogSubAgent.java`
 
-Inyectar `catalog://genres` en el system prompt del sub-agente de catálogo, en lugar de dejar que el modelo adivine los nombres de los géneros.
+Inyectar `catalog://genres` en el system prompt del sub-agente de catálogo, en lugar de dejar que el modelo adivine los nombres de los géneros. Si la lectura falla, registra un `WARN` y sigue sin la lista: a diferencia de quedarse sin tools, perder la lista solo quita una ayuda. `MembershipSubAgent` no cambia, porque no tiene nada que inyectar.
 
 > [!CAUTION]
 > **No leer recursos en el constructor.** Los sub-agentes se construyen al arrancar el contexto, cuando todavía no hay ningún usuario y el Token Relay no tiene token que propagar. La lectura va en el momento de la consulta, bajo la identidad de quien pregunta — que es justamente lo que hace confiable la recuperación perezosa de los clientes MCP.
@@ -268,19 +269,22 @@ Lo que hace a este plan una **base** y no un ejercicio cerrado:
 
 ### Verificación manual
 
-```bash
-TOKEN=...   # usuarioadmin
+**Explorar recursos, plantillas y prompts de un servicio** con MCP Inspector, conectado directamente al servidor:
 
-curl -H "Authorization: Bearer $TOKEN" http://localhost:9500/api/agent/resources
-curl -H "Authorization: Bearer $TOKEN" http://localhost:9500/api/agent/prompts
-curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:9500/api/agent/resources/content?uri=catalog://genres"
+```bash
+npx @modelcontextprotocol/inspector
 ```
 
-1. **Aislamiento por servicio:** `catalog://` sólo lo resuelve catálogo. Pedirle un `membership://` al cliente de catálogo debe fallar de forma explícita.
-2. **Autorización real:** con el token de `usuariocliente` (que no tiene `socio-permission-read`), `membership://socios/{id}` debe dar `403`, no una ficha.
-3. **Prueba conversacional:** preguntar por una película de un género y verificar en el `ExecutionTracker` que el género usado es una constante válida del enum.
-4. **En imagen nativa:** repetir 1–3 sobre `BUILD_TARGET=native-runtime`. **Es el único modo que puede revelar un hint faltante.**
+Conectarse a `http://localhost:8081/mcp` (catálogo) o `http://localhost:8082/mcp` (membresía) con transporte *Streamable HTTP*, autenticándose con el client `videoclub-mcp`.
+
+1. **Autorización real:** autenticado como `usuariocliente` (que no tiene `socio-permission-read`), leer `membership://socios/{id}` debe devolver un error de acceso denegado, no una ficha. Como `usuarioadmin`, debe devolver la ficha.
+2. **Prueba conversacional con los géneros**, verificada en vivo sobre imágenes nativas. En la base hay películas de solo algunos géneros y ninguna tool lista géneros, así que si el agente nombra un género sin películas, ese dato solo pudo salir del recurso:
+   * *"¿Qué géneros de películas maneja el videoclub, aunque todavía no haya películas cargadas de ese género?"* → responde `CatalogSubAgent`, con `Tools: []`, y nombra los 10 géneros del enum.
+   * *"Dá de alta Rocky como película de deportes"* (como `usuarioadmin`) → avisa que "deportes" no es un género válido y ofrece constantes reales, sin llamar a `create_movie` con un valor que la base rechazaría.
+3. **En imagen nativa:** repetir 1 y 2 sobre `BUILD_TARGET=native-runtime`. **Es el único modo que puede revelar un hint faltante.**
+
+> [!NOTE]
+> **Por qué en el chat no se ve la lectura del recurso.** Una tool la pide el modelo mientras razona, y el frontend la muestra. El recurso lo lee la aplicación **antes** de que el modelo empiece, en cada consulta de catálogo, así que no hay nada que mostrar "en el medio". Es la diferencia central entre las dos primitivas.
 
 ---
 
@@ -320,13 +324,13 @@ Con `noPrefix()`, una colisión en el provider agregado hace fallar `GET /api/ag
 > [!WARNING]
 > **Si en esta tarea se usa también `toolFilter`, atención a la firma.** En Spring AI 2.0.1, `McpToolFilter` es `BiPredicate<McpConnectionInfo, McpSchema.Tool>`: el segundo parámetro es el objeto `Tool`, no su nombre. Un filtro escrito como `(server, toolName) -> Set.of("x").contains(toolName)` **compila**, porque `Set.contains` acepta cualquier `Object`, pero devuelve siempre `false`: el cliente se queda sin ninguna tool y no hay error. Se comprobó compilando y ejecutando ese código contra 2.0.1. La forma correcta es `(info, tool) -> Set.of("x").contains(tool.name())`.
 
-### T2. Clasificar los errores MCP con una sola regla y devolver el código HTTP que corresponde
+### T2. Afinar la regla que decide que una tool fue denegada
 
-**Estado:** pendiente, con prioridad baja. Surge de la prueba de punta a punta sobre imágenes nativas. Tiene dos partes de urgencia distinta.
+**Estado:** pendiente, con prioridad baja. Surge de la prueba de punta a punta sobre imágenes nativas.
 
 #### El problema
 
-**Parte A — afecta al chat, que es lo que usan los usuarios.** `TrackingToolCallback` (líneas 60-64) decide que una tool fue **denegada** buscando texto en el mensaje de error:
+`TrackingToolCallback` (líneas 60-64) decide que una tool fue **denegada** buscando texto en el mensaje de error:
 
 ```java
 msg.contains("Access Denied")
@@ -339,53 +343,24 @@ msg.contains("Access Denied")
 
 `"No movie found with id 14030"` contiene `"403"`, así que un "no existe" se registra en `toolsDenied` y **el frontend lo muestra como una tool denegada**. Hace falta que el número coincida, pero cuando pasa el usuario ve un motivo falso.
 
-**Parte B — solo afecta a un endpoint de diagnóstico.** `GET /api/agent/resources/content` convierte cualquier error MCP en un `500` genérico y descarta el mensaje del servidor. Verificado en vivo:
-
-| Caso | Hoy | Debería ser | Mensaje que el servicio generó y se pierde |
-| :--- | :--- | :--- | :--- |
-| Sin permiso | `500` | `403` | `Access Denied` |
-| ID no numérico | `500` | `400` | `Invalid movie id: abc` |
-| ID inexistente | `500` | `404` | `No movie found with id 999999` |
-
-La parte B no se ve desde la UI: el frontend no usa ese endpoint. Por eso su prioridad es baja.
-
 #### Qué hay que hacer
 
-1. **Un clasificador compartido** en `videoclub-agent`, con una sola responsabilidad: recibir la excepción de una llamada MCP y decir qué pasó.
+1. Buscar la frase `Access Denied` o el nombre `AccessDeniedException`, y no números sueltos ni fragmentos de palabras.
+2. Agregar un test con un mensaje de "no existe" que contenga `403` y verificar que **no** se registre como denegado.
 
-   ```java
-   enum McpFailure { DENIED, NOT_FOUND, INVALID_INPUT, UNKNOWN }
-   record ClassifiedMcpError(McpFailure kind, String serverMessage) {}
-   ```
+#### Límite que hay que respetar
 
-   `TrackingToolCallback` y `AgentController` lo usan los dos, así tools y recursos deciden con **la misma** regla.
+**La denegación solo puede detectarse por texto.** Verificado en las fuentes de Spring AI 2.0.1, el camino completo es:
 
-2. **Ajustar la detección de denegación** para que busque la frase `Access Denied` o el nombre `AccessDeniedException`, y no números sueltos ni fragmentos de palabras.
+1. `@PreAuthorize` lanza `AccessDeniedException` **antes** de que corra el método de la tool, así que el servicio no tiene oportunidad de traducirla.
+2. Del lado del servidor, `AbstractSyncMcpToolMethodCallback.createSyncErrorResult` la convierte en un `CallToolResult` con `isError: true` y el mensaje de la excepción **como texto**.
+3. Del lado del cliente, `SyncMcpToolCallback` lanza `ToolExecutionException("Error calling tool: " + contenido)`.
 
-3. **Expresar "no existe" con un código, no con texto.** Verificado en `SyncStatelessMcpResourceMethodCallback`: si el propio método lanza un `McpError`, Spring AI lo deja pasar intacto.
+**En ningún punto aparece un código de error**: lo único que llega a `TrackingToolCallback` es texto. Por eso la regla no puede reemplazarse por un código, y tiene que ser precisa.
 
-   ```java
-   if (e instanceof McpError mcpError && mcpError.getJsonRpcError() != null) {
-       throw mcpError;                                    // pasa con su código
-   }
-   throw McpError.builder(ErrorCodes.INVALID_PARAMS)     // todo lo demás termina en -32602
-   ```
-
-   El SDK define `ErrorCodes.RESOURCE_NOT_FOUND = -32002`, que es el código que establece MCP. Los recursos de `catalog-service` y `membership-service` pueden lanzarlo, y el agente decide por el número, no por cómo está redactado el mensaje.
-
-4. **En `readResourceContent`, traducir a HTTP** (`403`, `404`, `400`) y devolver el mensaje del servidor en esos tres casos. El `500` para lo desconocido mantiene el mensaje genérico, para no exponer detalles internos.
-
-#### Límites que hay que respetar
-
-* **La denegación nunca puede llegar como código.** `@PreAuthorize` rechaza **antes** de que corra el método, así que el servicio no tiene oportunidad de traducirla. Para ese caso buscar el texto es inevitable, y por eso la regla del punto 2 tiene que ser precisa.
-* **`-32602` no alcanza para "entrada inválida".** Es el código que Spring AI le pone a **todo** lo que envuelve, incluida una base de datos caída. Mapear "todo `-32602` a `400`" haría que una caída de PostgreSQL se viera como un error del cliente.
+> [!NOTE]
+> **Tools y recursos fallan distinto.** Una tool devuelve un resultado normal marcado con `isError: true`. Un recurso, en cambio, falla con un error JSON-RPC (`-32602`, verificado en `SyncStatelessMcpResourceMethodCallback`). Quien escriba código que maneje errores de las dos primitivas no puede asumir que se comportan igual.
 
 #### Qué aporta
 
-* **El chat deja de mostrar motivos falsos.** Una tool que no encontró datos no aparece como denegada.
-* **Los mensajes accionables llegan hasta quien los necesita.** Los servicios ya los generan con cuidado (`McpToolsNotFoundTest` existe justamente para eso), y hoy se pierden en la última capa.
-* **Cada servicio nuevo hereda un contrato de códigos**, en lugar de tener que copiar exactamente la redacción de un mensaje para que el agente lo entienda.
-
-> [!NOTE]
-> **Responder `403` o `404` no permite adivinar qué IDs existen.** Como `@PreAuthorize` corre antes de buscar el registro, quien no tiene permiso recibe `403` siempre, exista o no el ID. La diferencia entre `403` y `404` solo la ve quien sí está autorizado.
-
+**El chat deja de mostrar motivos falsos.** Una tool que no encontró datos deja de aparecer como denegada, y el indicador de tools denegadas vuelve a significar exactamente eso.
