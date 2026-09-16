@@ -38,7 +38,14 @@ La plataforma VideoClub está organizada en microservicios desacoplados y servic
 
 ---
 
-### ⚙️ 2. Backend Core: Datos, Seguridad y Eventos (`springboot-sso`)
+### 🗺️ 2. Vista de conjunto
+
+* **[Arquitectura de la Plataforma (Modelo C4)](arquitectura-c4.md)**:
+  Diagramas de **Contexto** (quién usa el sistema y con qué sistemas externos habla) y de **Contenedores** (qué procesos corren, con qué tecnología y cómo se comunican). Es el mapa que da sentido a los documentos por dominio: si es la primera vez que mirás el sistema, empezá acá.
+
+---
+
+### ⚙️ 3. Backend Core: Datos, Seguridad y Eventos (`springboot-sso`)
 
 **[Arquitectura de Dos Servicios: Decisiones y Trampas](arquitectura-dos-servicios.md)** — documento de referencia del corte. Decisiones D1–D7 (por qué no hay multi-módulo Maven, por qué las clases cross-cutting se duplican, cómo se reparten los clients de Keycloak) y trampas C1–C10: cosas que compilan, arrancan y fallan en runtime o en silencio. Es también el destino de los comentarios `Duplicated by design` del código.
 
@@ -75,7 +82,7 @@ Ninguno de los dos necesita estar registrado como client en Keycloak para **vali
 
 ---
 
-### 🌐 3. Entrada, Enrutamiento y CORS (`apigateway`)
+### 🌐 4. Entrada, Enrutamiento y CORS (`apigateway`)
 
 * **[Arquitectura y Configuración del API Gateway](api-gateway.md)**:
   Especificación de la fachada orientada a recursos, aislamiento del puerto de Keycloak (`:9090`) para preservar el claim `iss`, resolución de CORS en el borde y pruebas comparativas directas vs. Gateway.
@@ -84,7 +91,7 @@ Ninguno de los dos necesita estar registrado como client en Keycloak para **vali
 
 ---
 
-### 🤖 4. Inteligencia Artificial, Streaming y UI Generativa (`agente-videoclub-sso`)
+### 🤖 5. Inteligencia Artificial, Streaming y UI Generativa (`agente-videoclub-sso`)
 
 * **[Propagación de Tokens SSO (Token Relay)](https://github.com/munozhoracio/agente-videoclub-sso/blob/main/docs/sso-token-propagation.md)**:
   Arquitectura para reenviar el Bearer JWT del usuario autenticado desde el frontend hacia el Agente y de este hacia las tools MCP del backend, preservando la identidad del usuario final en llamadas intermediadas por IA.
@@ -102,7 +109,7 @@ Ninguno de los dos necesita estar registrado como client en Keycloak para **vali
 
 ---
 
-### 💻 5. Frontend SPA: Interfaz y Experiencia de Usuario (`react-sso`)
+### 💻 6. Frontend SPA: Interfaz y Experiencia de Usuario (`react-sso`)
 
 * **[Documentación del Frontend en React 19](https://github.com/hmunoz/react-sso#readme)**:
   Implementación de `react-oidc-context` con PKCE, hook `usePermissions()`, protección de rutas con `PermissionGuard`, caché asíncrona con TanStack Query y componentes interactivos para el catálogo, usuarios y chat con el agente.
@@ -169,6 +176,7 @@ Todos los documentos de este hub están **alineados con la arquitectura de dos s
 
 | Documento | Estado |
 | :--- | :--- |
+| [arquitectura-c4.md](arquitectura-c4.md) | Diagramas C4 de contexto y contenedores. |
 | [adr.md](adr.md) | ADR-001 a ADR-014. Los dos últimos registran la estrategia de microservicios. |
 | [arquitectura-dos-servicios.md](arquitectura-dos-servicios.md) | Decisiones D1–D7 y trampas C1–C10. |
 | [mcp-server.md](mcp-server.md) | Dos servidores MCP, uno por servicio. |
