@@ -165,13 +165,15 @@ Los hostnames son las **claves de servicio** de los compose, que es lo que resue
 
 ## 📌 Estado de esta documentación
 
-El corte en dos servicios es reciente y **no todos los documentos de este hub se actualizaron todavía**. Los siguientes siguen describiendo el monolito en sus ejemplos (puertos `:8080`, base `video`, packages `ar.unrn.video.*`). Los conceptos que explican siguen siendo válidos; lo que envejeció son las coordenadas:
+Todos los documentos de este hub están **alineados con la arquitectura de dos servicios**. Los `:8080` que quedan en [CORS.md](CORS.md) §5.3 y §5.4 son deliberados: son post-mortems de configuraciones pasadas y cambiarles el puerto falsificaría lo que ocurrió.
 
-| Documento | Qué revisar |
+| Documento | Estado |
 | :--- | :--- |
-| [mcp-server.md](mcp-server.md) | Describe un servidor MCP único con las 6 tools; ahora son dos servidores. |
-| [socios.md](socios.md) | Packages y base de datos, hoy bajo `membership-service`. |
-| [CORS.md](CORS.md) | Ejemplos con `curl` contra `:8080`. |
-| [seguridad-oauth2-openid-connect-keycloak.md](seguridad-oauth2-openid-connect-keycloak.md) | Rutas de clases y puertos del Resource Server. |
-| [api-gateway.md](api-gateway.md) | Tabla de ruteo previa al corte. |
-| [adr.md](adr.md) | Llega hasta ADR-012; la separación en dos servicios todavía no tiene su ADR. |
+| [adr.md](adr.md) | ADR-001 a ADR-014. Los dos últimos registran la estrategia de microservicios. |
+| [arquitectura-dos-servicios.md](arquitectura-dos-servicios.md) | Decisiones D1–D7 y trampas C1–C10. |
+| [mcp-server.md](mcp-server.md) | Dos servidores MCP, uno por servicio. |
+| [socios.md](socios.md) | `membership-service`, base `video_membership`. |
+| [CORS.md](CORS.md) | Capas y diagnóstico sobre `:8081` / `:8082`. |
+| [seguridad-oauth2-openid-connect-keycloak.md](seguridad-oauth2-openid-connect-keycloak.md) | Swagger por servicio y el caso del `redirect_uri`. |
+| [api-gateway.md](api-gateway.md) | Tabla de ruteo a `catalog` y `membership`. |
+| [keycloak-rabbitmq-integration.md](keycloak-rabbitmq-integration.md) | Topología AMQP con diagramas. |

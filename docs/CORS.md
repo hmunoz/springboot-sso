@@ -18,7 +18,7 @@ Un **origen** es la tupla `esquema + host + puerto`. Nada más:
 | --- | --- |
 | `http://localhost:5173` | Sí |
 | `http://localhost:5173/` | No — la barra final sobra |
-| `http://localhost:8080/swagger-ui/` | No — un origen no lleva path |
+| `http://localhost:8081/swagger-ui/` | No — un origen no lleva path |
 | `localhost:5173` | No — falta el esquema |
 
 Dos consecuencias que hay que tener claras:
@@ -39,7 +39,7 @@ sequenceDiagram
     autonumber
     participant B as Navegador<br/>(SPA en :5173)
     participant G as API Gateway<br/>(:9500)
-    participant A as Backend<br/>(:8080)
+    participant A as catalog-service<br/>(:8081)
 
     Note over B: fetch('/movies', { headers: { Authorization: 'Bearer ...' } })
 
@@ -90,7 +90,7 @@ flowchart LR
         GWCFG -.-> GW
     end
 
-    subgraph BEB ["Backend (:8080)"]
+    subgraph BEB ["Servicio de dominio (:8081 / :8082)"]
         direction TB
         BECFG["corsConfigurationSource bean<br/>SecurityConfiguration.java"]
         BE["Spring Boot / Resource Server"]
@@ -183,7 +183,10 @@ http.cors(withDefaults())
 "webOrigins": ["+"]
 ```
 
-`"+"` significa *derivá los orígenes permitidos de los `redirectUris` de este cliente*. Como los `redirectUris` ya listan `:5173`, `:3000` y `:8080`, no hace falta repetirlos.
+`"+"` significa *derivá los orígenes permitidos de los `redirectUris` de este cliente*. Como los `redirectUris` ya listan `:5173`, `:3000` y los puertos de Swagger UI, no hace falta repetirlos.
+
+> [!WARNING]
+> **`"+"` hace que los `redirectUris` sean también la lista de orígenes CORS, así que un puerto nuevo hay que agregarlo ahí.** Al separar el backend en dos servicios, Swagger UI pasó de `:8080` a `:8081` y `:8082`, y el realm seguía autorizando solo `:8080`. El síntoma no es un error de CORS sino un rechazo de Keycloak antes del login: **`Parámetro no válido: redirect_uri`**. Se corrigió agregando `http://localhost:8081/swagger-ui/*` y `http://localhost:8082/swagger-ui/*` a `videoclub-frontend`.
 
 Valores especiales de Keycloak:
 
@@ -262,9 +265,9 @@ flowchart TD
 
     Q1 -- ":9090 Keycloak" --> KC["Revisar webOrigins del cliente<br/>en realm-export.json"]
     Q1 -- ":9500 Gateway" --> Q2
-    Q1 -- ":8080 Backend directo" --> BE["Revisar corsConfigurationSource<br/>y que http.cors() esté en la cadena"]
+    Q1 -- ":8081 / :8082 servicio directo" --> BE["Revisar corsConfigurationSource<br/>y que http.cors() esté en la cadena"]
 
-    Q2{"¿Qué status<br/>devolvió el OPTIONS?"} -- "401" --> A401["Falta http.cors() en el<br/>SecurityFilterChain del backend"]
+    Q2{"¿Qué status<br/>devolvió el OPTIONS?"} -- "401" --> A401["Falta http.cors() en el<br/>SecurityFilterChain del servicio"]
     Q2 -- "200 sin cabeceras CORS" --> A200["globalcors no matchea la ruta<br/>en gateway.yml"]
     Q2 -- "200 con cabeceras duplicadas" --> ADUP["Falta DedupeResponseHeader,<br/>o Gateway y backend difieren"]
     Q2 -- "404" --> A404["La ruta no existe en gateway.yml.<br/>No es un problema de CORS"]

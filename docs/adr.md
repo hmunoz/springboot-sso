@@ -18,6 +18,8 @@ Este documento centraliza todos los **Architecture Decision Records (ADR)** del 
 * [ADR-010: Metadatos de Recursos Protegidos (RFC 9728) y Clientes MCP Públicos con PKCE](#adr-010-metadatos-de-recursos-protegidos-rfc-9728-y-clientes-mcp-públicos-con-pkce)
 * [ADR-011: Declaración Explícita de Hints de Solo Lectura en Herramientas MCP](#adr-011-declaración-explícita-de-hints-de-solo-lectura-en-herramientas-mcp)
 * [ADR-012: Bridge Stdio con Direct Access Grants para Clientes No Interactivos (Antigravity)](#adr-012-bridge-stdio-con-direct-access-grants-para-clientes-no-interactivos-antigravity)
+* [ADR-013: Un Esquema por Microservicio (Database per Service)](#adr-013-un-esquema-por-microservicio-database-per-service)
+* [ADR-014: Comunicación Este-Oeste Solo por Bus de Mensajes, No por HTTP](#adr-014-comunicación-este-oeste-solo-por-bus-de-mensajes-no-por-http)
 
 ---
 
@@ -240,7 +242,7 @@ Los agentes de IA modernos (como Claude Code CLI) implementan la especificación
 2. Registrar en Keycloak el cliente público **`videoclub-mcp`** con PKCE (`S256`) y `redirectUris` locales en loopback (`http://localhost:8090/*`).
 
 #### Justificación
-* Permite el flujo interactivo de Claude CLI (`claude mcp add --transport http --client-id videoclub-mcp --callback-port 8090 videoclub http://localhost:8080/mcp`): el cliente recibe un 401 con `WWW-Authenticate`, descubre Keycloak por sí mismo, abre el navegador, autentica al usuario y completa el canje de código por token de forma desatendida.
+* Permite el flujo interactivo de Claude CLI (`claude mcp add --transport http --client-id videoclub-mcp --callback-port 8090 videoclub http://localhost:8081/mcp`): el cliente recibe un 401 con `WWW-Authenticate`, descubre Keycloak por sí mismo, abre el navegador, autentica al usuario y completa el canje de código por token de forma desatendida.
 
 #### Consecuencias
 * **Positivas:** Interoperabilidad total con cualquier cliente MCP compliant con el estándar abierto.
@@ -281,8 +283,81 @@ A diferencia de Claude CLI, el IDE Antigravity ejecuta servidores MCP en proceso
 Implementar un bridge ligero en Python (`.agents/scripts/mcp-bridge.py`) configurado en `.agents/mcp_config.json`, que utiliza el flujo **Direct Access Grants (ROPC)** contra Keycloak.
 
 #### Justificación
-* El cliente `videoclub-mcp` tiene habilitado `directAccessGrantsEnabled: true`. El bridge obtiene el JWT mediante HTTP POST directo sin abrir navegador, renueva el token automáticamente antes de su expiración y reenvía las peticiones JSON-RPC a `http://localhost:8080/mcp`.
+* El cliente `videoclub-mcp` tiene habilitado `directAccessGrantsEnabled: true`. El bridge obtiene el JWT mediante HTTP POST directo sin abrir navegador, renueva el token automáticamente antes de su expiración y reenvía las peticiones JSON-RPC al endpoint MCP del servicio.
 * Intercepta mensajes propietarios o iniciales de sondeo (`server/discover`) respondiendo `-32601 Method not found`, lo que permite que el cliente en Go de Antigravity proceda de inmediato al handshake de `initialize`.
+
+> [!NOTE]
+> **Enmienda posterior a ADR-013.** Cuando se escribió este ADR había un único servidor MCP en `:8080`. Desde la separación en microservicios hay dos —`catalog-service` en `:8081/mcp` y `membership-service` en `:8082/mcp`— y el bridge se configura por servicio con la variable `MCP_URL`. La decisión no cambia; cambian las coordenadas.
 
 #### Consecuencias
 * **Positivas:** Conexión MCP en Antigravity 100% autónoma y transparente, con renovación perpetua de sesión y posibilidad de alternar entre perfiles (`usuarioadmin` vs `usuariocliente`) mediante variables de entorno.
+
+---
+
+### ADR-013: Un Esquema por Microservicio (Database per Service)
+
+* **Estado:** Aceptado e Implementado
+* **Fecha:** Septiembre 2026
+
+#### Contexto
+El backend era un único Spring Boot (`ar.unrn.video`) con una sola base `video`, donde las tablas `movie` y `socio` convivían en el mismo esquema. Nada impedía escribir un `JOIN` entre ambas ni abrir una transacción que las abarcara: la frontera entre catálogo y membresía existía solo en la disciplina de quien escribía el código.
+
+Al separar el backend en `catalog-service` y `membership-service` había que decidir si compartirían la base.
+
+#### Decisión
+**Cada microservicio es dueño exclusivo de su propio esquema.**
+
+* `catalog-service` → base `video_catalog`, tablas del agregado `Movie`.
+* `membership-service` → base `video_membership`, tablas del agregado `Socio`.
+* Ningún servicio recibe credenciales de la base del otro. `docker/postgresql/init.sql` crea ambas; cada servicio crea sus tablas al arrancar con `ddl-auto: update`.
+* Se comparte el **motor** PostgreSQL, no el esquema: es una concesión al costo de infraestructura de un entorno de taller, no a la frontera lógica.
+
+#### Justificación
+* **La frontera pasa de convención a imposibilidad.** Un `JOIN` entre `movie` y `socio` ya no compila ni falla en revisión: no hay conexión que lo permita. Es la diferencia entre una regla que hay que recordar y una que el sistema hace cumplir.
+* **Permite evolucionar los esquemas por separado.** Una migración en el catálogo no obliga a coordinar un despliegue con membresía.
+* **Es la precondición de ADR-014.** Sin esquemas separados, la comunicación por bus sería una formalidad: cualquiera podría saltearla leyendo la tabla del otro directamente.
+
+#### Consecuencias
+* **Positivas:** Acoplamiento estructural eliminado. Cada servicio puede extraerse a su propio motor, o a su propio repositorio, sin tocar al otro. Verificado: ninguna clase de un servicio referencia tipos del otro.
+* **Trade-offs:**
+  * **No hay consultas cruzadas.** Responder "qué películas alquiló este socio" exigirá composición en un cliente, o replicar el dato por eventos. No es un descuido: es el costo que se acepta.
+  * **No hay transacción distribuida.** Una operación que abarque ambos dominios necesita consistencia eventual — ver ADR-002, que ya analiza por qué en este sistema no aplican SAGA ni Outbox.
+  * Dos orígenes de datos que respaldar y versionar en vez de uno.
+
+---
+
+### ADR-014: Comunicación Este-Oeste Solo por Bus de Mensajes, No por HTTP
+
+* **Estado:** Aceptado e Implementado
+* **Fecha:** Septiembre 2026
+
+#### Contexto
+Con los esquemas ya separados (ADR-013), el camino de menor resistencia para que un servicio necesite un dato del otro es exponer un endpoint REST y llamarlo. Es lo que suele pasar por default, y es cómo un conjunto de microservicios se convierte en un monolito distribuido: los mismos acoplamientos de antes, ahora con latencia de red y fallos parciales.
+
+#### Decisión
+**Entre servicios de dominio no hay llamadas HTTP. La comunicación este-oeste ocurre exclusivamente por el bus de RabbitMQ**, publicando eventos de dominio en el exchange `videoclub.events`.
+
+Distinción explícita de los dos ejes:
+
+| Eje | Quién habla | Transporte |
+| :--- | :--- | :--- |
+| **Norte-sur** (cliente → servicio) | Frontend y agente IA, a través del API Gateway o de MCP | HTTP |
+| **Este-oeste** (servicio ↔ servicio) | `catalog-service` ↔ `membership-service` | **Solo bus AMQP** |
+
+**Excepción única: Keycloak.** `membership-service` llama a la Admin REST API por HTTP (`KeycloakAdminClient`, client credentials). Keycloak es un proveedor de identidad externo con una API sincrónica que no publica un equivalente por bus para las operaciones de escritura, y el alta de usuario necesita respuesta inmediata. La excepción está acotada a un único cliente en un único servicio.
+
+#### Justificación
+* **Evita el monolito distribuido.** Una llamada HTTP sincrónica entre servicios propaga el fallo: si membresía está caída, catálogo deja de responder. Un evento en el bus se acumula en la cola y se procesa cuando el consumidor vuelve.
+* **Invierte la dirección del acoplamiento.** Con HTTP, quien necesita el dato tiene que conocer la dirección, el contrato y la disponibilidad del otro. Con eventos, el productor publica lo que pasó en su dominio y no sabe quién escucha. Agregar un tercer servicio no obliga a tocar a los existentes.
+* **La infraestructura ya está.** RabbitMQ, el exchange `videoclub.events` y el patrón de publicación con *publisher confirms* existen desde la integración con Keycloak. No hay componente nuevo que operar.
+* **Es verificable.** El único cliente HTTP saliente de todo el backend es `KeycloakAdminClient`. Cualquier `RestClient` nuevo apuntando a otro servicio de dominio es una violación detectable con un `grep`.
+
+#### Consecuencias
+* **Positivas:** Aislamiento de fallos entre dominios. Servicios desplegables por separado. La incorporación de un nuevo consumidor no modifica al productor.
+* **Trade-offs:**
+  * **No hay lectura sincrónica del otro dominio.** Si catálogo necesitara datos de socios, la salida es mantener una réplica local alimentada por eventos, con la consistencia eventual que eso implica.
+  * **Depurar es más difícil.** Un flujo repartido entre publicaciones y consumos no se sigue con un stack trace. Es la razón por la que el `ExecutionTracker` y los logs por evento importan.
+  * **El bus pasa a ser infraestructura crítica.** Si RabbitMQ cae, los dominios dejan de enterarse de lo que pasa en el otro. Mitigado con colas durables, *publisher confirms* y la DLQ documentada en ADR-001.
+
+> [!NOTE]
+> **El servidor MCP no viola esta regla.** `catalog:8081/mcp` y `membership:8082/mcp` los consume el agente IA, que es un **cliente** del ecosistema, no un servicio de dominio par. Ese tráfico es norte-sur aunque ocurra dentro de la red de Docker.

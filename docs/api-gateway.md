@@ -13,16 +13,17 @@ flowchart TD
     SPA["Frontend SPA (React)<br/>http://localhost:5173"]
     KC["Keycloak (IdP / Autoridad)<br/>http://localhost:9090"]
     GW["Spring Cloud Gateway<br/>http://localhost:9500"]
-    BE["Backend / Monolito Modular<br/>http://localhost:8080"]
-    S_SOCIOS["Microservicio Socios (Futuro)<br/>http://localhost:8082"]
+    CAT["catalog-service<br/>http://catalog:8081"]
+    MEM["membership-service<br/>http://membership:8082"]
+    AG["Agente IA<br/>http://agent:8085"]
 
     SPA -- "1. Autenticación directa (OIDC)" --> KC
     SPA -- "2. Peticiones con Bearer JWT" --> GW
-    GW -- "/movies/**" --> BE
-    GW -- "/api/users/**" --> BE
-    GW -- "/api/notifications/** (SSE)" --> BE
-    GW -. "/api/socios/** (Migración)" .-> S_SOCIOS
-    GW -- "/api/socios/** (Actual)" --> BE
+    GW -- "/movies/**" --> CAT
+    GW -- "/api/socios/**" --> MEM
+    GW -- "/api/users/**" --> MEM
+    GW -- "/api/notifications/** (SSE)" --> MEM
+    GW -- "/api/agent/**" --> AG
 ```
 
 ### Principios Fundamentales
@@ -64,16 +65,16 @@ sequenceDiagram
     participant SPA as React SPA (:5173)
     participant KC as Keycloak (:9090)
     participant GW as API Gateway (:9500)
-    participant BE as Backend Resource Server (:8080)
+    participant CAT as catalog-service (:8081)
 
     User->>SPA: Accede a la aplicación
     SPA->>KC: Redirección OAuth2 / Token request
     KC-->>SPA: Retorna JWT (iss: http://localhost:9090/...)
     Note over SPA,GW: El frontend solo usa el Gateway para llamadas de negocio
     SPA->>GW: GET /movies (Header: Bearer JWT)
-    GW->>BE: Proxy inverso a http://host.docker.internal:8080/movies
-    BE->>BE: Valida firma de JWT contra jwks_uri de Keycloak
-    BE-->>GW: 200 OK [Listado de Películas]
+    GW->>CAT: Proxy inverso a http://catalog:8081/movies
+    CAT->>CAT: Valida firma de JWT contra jwks_uri de Keycloak
+    CAT-->>GW: 200 OK [Listado de Películas]
     GW-->>SPA: 200 OK [Listado de Películas]
 ```
 
@@ -111,7 +112,7 @@ spring:
                 allowCredentials: true
           routes:
             - id: service-catalogo
-              uri: http://host.docker.internal:8080
+              uri: http://catalog:8081
               predicates:
                 - Path=/movies/**
               filters:
@@ -141,7 +142,7 @@ services:
       - ./gateway/gateway.yml:/workspace/config/application.yml:ro
 ```
 
-* **`extra_hosts`:** Permite que el contenedor del Gateway en entornos Linux resuelva `host.docker.internal` hacia el host de desarrollo (donde corre `springboot-sso` en `:8080`).
+* **`extra_hosts`:** Permite que el contenedor del Gateway resuelva `host.docker.internal` hacia el host de desarrollo. Desde la separación en dos servicios ya no se usa para el backend: `catalog` y `membership` corren en la misma red `videoclub_default` y se resuelven por nombre de servicio.
 * **Volumen `/workspace/config/application.yml`:** Monta el archivo externo de rutas y CORS sin necesidad de lidiar con el formateo sensible de variables de entorno en listas y mapas YAML.
 
 ---
@@ -150,10 +151,16 @@ services:
 
 | ID de Ruta | Predicado (Path) | Destino Interno | Filtros Aplicados |
 | :--- | :--- | :--- | :--- |
-| `service-catalogo` | `/movies/**` | `http://host.docker.internal:8080` | `DedupeResponseHeader` |
-| `service-socios` | `/api/socios/**` | `http://host.docker.internal:8080` | `DedupeResponseHeader` |
-| `service-users` | `/api/users/**` | `http://host.docker.internal:8080` | `DedupeResponseHeader` |
-| `service-notificaciones` | `/api/notifications/**` | `http://host.docker.internal:8080` | `DedupeResponseHeader` |
+| `service-catalogo` | `/movies/**` | `http://catalog:8081` | `DedupeResponseHeader` |
+| `service-socios` | `/api/socios/**` | `http://membership:8082` | `DedupeResponseHeader` |
+| `service-users` | `/api/users/**` | `http://membership:8082` | `DedupeResponseHeader` |
+| `service-notificaciones` | `/api/notifications/**` | `http://membership:8082` | `DedupeResponseHeader` |
+| `agent-service` | `/api/agent/**` | `http://agent:8085` | `DedupeResponseHeader` |
+
+> [!NOTE]
+> Los destinos son **nombres de servicio de Docker Compose**, no `host.docker.internal`. La clave del servicio en el compose es el hostname DNS dentro de `videoclub_default`, y por eso el gateway resuelve igual en desarrollo y en producción. Si cambia ahí, hay que cambiarla también acá.
+>
+> Todo este ruteo es tráfico **norte-sur** (cliente → servicio). Entre `catalog-service` y `membership-service` no hay tráfico HTTP: se comunican por el bus de RabbitMQ. Ver ADR-014.
 
 ---
 
@@ -167,9 +174,9 @@ VITE_API_BASE_URL=http://localhost:9500
 ### Pruebas Automatizadas con Cliente HTTP
 Las pruebas se encuentran centralizadas en [VideoClub con Seguridad.http](file:///home/horacio/proyectos/unrn/taller/springboot-sso/postman/VideoClub%20con%20Seguridad.http):
 
-1. **Prueba Directa al Backend (:8080):**
+1. **Prueba Directa a `catalog-service` (:8081), salteando el Gateway:**
    ```http
-   GET http://localhost:8080/movies
+   GET http://localhost:8081/movies
    Authorization: Bearer {{access_token}}
    ```
 2. **Prueba a través del API Gateway (:9500):**
@@ -179,5 +186,5 @@ Las pruebas se encuentran centralizadas en [VideoClub con Seguridad.http](file:/
    ```
 3. **Soporte Server-Sent Events (SSE):**
    ```bash
-   curl -N -H "Accept: text/event-stream" http://localhost:9500/api/notifications/subscribe
+   curl -N -H "Accept: text/event-stream" http://localhost:9500/api/notifications/stream
    ```

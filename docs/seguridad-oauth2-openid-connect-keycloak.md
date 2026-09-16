@@ -578,7 +578,7 @@ Ese es el pago concreto del modelo de §6: la identidad organizacional cambia en
 
 ### Swagger UI como cliente OAuth2 con PKCE
 
-El backend expone Swagger UI en `http://localhost:8080/swagger-ui/index.html`, configurado para autenticarse **contra Keycloak con el mismo flujo Authorization Code + PKCE** que usa la SPA:
+Cada servicio expone su propio Swagger UI —`http://localhost:8081/swagger-ui/index.html` para el catálogo y `http://localhost:8082/swagger-ui/index.html` para membresía—, configurado para autenticarse **contra Keycloak con el mismo flujo Authorization Code + PKCE** que usa la SPA:
 
 ```yaml
 springdoc:
@@ -592,7 +592,10 @@ springdoc:
       use-pkce-with-authorization-code-grant: true
 ```
 
-Por eso `videoclub-frontend` incluye `http://localhost:8080/swagger-ui/*` entre sus `redirectUris`: Swagger UI es, a los ojos de Keycloak, **otro cliente público más**.
+Por eso `videoclub-frontend` incluye los `swagger-ui/*` de ambos servicios entre sus `redirectUris`: Swagger UI es, a los ojos de Keycloak, **otro cliente público más**.
+
+> [!TIP]
+> **Esto dio un error real y vale como ejercicio.** Al separar el backend en dos servicios, Swagger pasó de `:8080` a `:8081` y `:8082`, pero el realm seguía autorizando solo el puerto viejo. Presionar **Authorize** devolvía `Parámetro no válido: redirect_uri` — Keycloak rechazando **antes** de mostrar el login. Es la demostración más limpia de por qué un cliente público no puede elegir a dónde volver: si pudiera, cualquiera montaría un sitio que reciba tu código de autorización.
 
 Didácticamente vale oro: permite probar los endpoints con distintos usuarios sin escribir una línea de frontend, y muestra en vivo que el mismo flujo de autorización sirve para una SPA de React o para una herramienta de documentación. El botón **Authorize** de Swagger dispara exactamente la secuencia del diagrama de §4.
 
@@ -827,7 +830,7 @@ El proyecto `react-sso` necesita un archivo `.env` en su raíz:
 ```bash
 VITE_AUTHORITY=http://localhost:9090/realms/videoclub
 VITE_CLIENT_ID=videoclub-frontend
-VITE_API_BASE_URL=http://localhost:8080
+VITE_API_BASE_URL=http://localhost:9500   # el Gateway, que rutea a ambos servicios
 ```
 
 > **Nada secreto vive acá.** Vite inyecta las variables `VITE_*` en el bundle en tiempo de compilación, así que cualquiera puede leerlas con las DevTools. Y está bien: un cliente público **no tiene secretos que guardar** (§3). El día que alguien quiera poner un `VITE_CLIENT_SECRET`, la respuesta es no — y el motivo es PKCE.
@@ -1155,11 +1158,13 @@ Servicios y puertos resultantes:
 | Servicio | URL | Para qué |
 | --- | --- | --- |
 | Keycloak | `http://localhost:9090` | Consola de administración y endpoints OIDC |
-| Backend | `http://localhost:8080` | API REST + Swagger UI |
+| `catalog-service` | `http://localhost:8081` | API REST del catálogo + Swagger UI |
+| `membership-service` | `http://localhost:8082` | API REST de socios y usuarios + Swagger UI |
+| API Gateway | `http://localhost:9500` | Punto de entrada único para el frontend |
 | Frontend | `http://localhost:5173` | SPA React 19 |
 | MailHog | `http://localhost:8025` | Bandeja de correo de desarrollo |
 | RabbitMQ | `http://localhost:15672` | Consola del broker (eventos de §12) |
-| PostgreSQL | `localhost:5432` | Base de datos de películas |
+| PostgreSQL | `localhost:5432` | Dos bases: `video_catalog` y `video_membership` |
 
 > **Sobre `--env-file`.** `docker/keycloak.yaml` publica `${KEYCLOAK_PORT:-9090}:8080` y el puerto real sale de `docker/.env`, que define `KEYCLOAK_PORT=9090`. Ambos valores coinciden, así que si el archivo de entorno no se carga el stack sigue apuntando al mismo lugar. El día que cambies el puerto, cambialo también en `KC_HOSTNAME` (`docker/keycloak.yaml`): si Keycloak se anuncia en un puerto donde no escucha, el síntoma es un `401` con *issuer mismatch*, y es la falla número uno del laboratorio.
 >
@@ -1188,7 +1193,7 @@ El frontend necesita su propio `.env` (ver §11) antes del primer `npm run dev`.
 #### Caso 1: Intentar acceder a un recurso protegido sin token
 
 ```bash
-curl -i http://localhost:8080/movies
+curl -i http://localhost:9500/movies
 ```
 
 - **Resultado esperado**: `401 Unauthorized`.
@@ -1217,7 +1222,7 @@ curl -i http://localhost:8080/movies
 
 #### Caso 5: El mismo flujo, otro cliente — Swagger UI
 
-1. Abrir `http://localhost:8080/swagger-ui/index.html`.
+1. Abrir `http://localhost:8081/swagger-ui/index.html` (el catálogo).
 2. Presionar **Authorize**. Swagger redirige a Keycloak con Authorization Code + PKCE, igual que la SPA (§8).
 3. Autenticarse como `usuariocliente` e intentar `POST /movies` → `403` con un cuerpo `application/problem+json`.
 4. Cerrar sesión, repetir como `usuarioadmin` → `201 Created`.
