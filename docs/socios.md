@@ -1,6 +1,9 @@
 # Bounded Context: Gestión y Sincronización de Socios
 
-Este documento describe el modelo de dominio, la persistencia, el procesamiento asíncrono de eventos y la API REST del módulo de **Socios** en la plataforma VideoClub.
+Este documento describe el modelo de dominio, la persistencia, el procesamiento asíncrono de eventos y la API REST del dominio de **Socios** en la plataforma VideoClub.
+
+> [!NOTE]
+> **Desde la separación en microservicios, este bounded context es un servicio propio: `membership-service` (`:8082`).** Es dueño exclusivo de la base `video_membership` — ver [ADR-013](adr.md#adr-013-un-esquema-por-microservicio-database-per-service) — y no comparte tablas con `catalog-service`. Ya no es un "módulo" dentro de un backend: el aislamiento dejó de ser una convención y pasó a ser estructural.
 
 ---
 
@@ -13,8 +16,8 @@ flowchart LR
     KC["Keycloak (IdP)"] -->|Eventos Técnicos| ACL["Anti-Corruption Layer<br/>(KeycloakEventListener)"]
     ACL -->|Eventos de Negocio| RMQ["Exchange videoclub.events"]
     RMQ -->|Cola socio.events.queue| LIS["SocioEventListener"]
-    LIS -->|Idempotent Upsert| DB[("PostgreSQL (socio)")]
-    DB --> REST["API REST /api/socios"]
+    LIS -->|Idempotent Upsert| DB[("video_membership<br/>tabla socio")]
+    DB --> REST["API REST /api/socios<br/>membership-service :8082"]
     REST --> UI["Frontend React (SociosView)"]
 ```
 
@@ -22,7 +25,7 @@ flowchart LR
 
 ## 2. Modelo de Dominio y Persistencia
 
-### Entidad JPA (`ar.unrn.video.domain.Socio`)
+### Entidad JPA (`ar.unrn.video.membership.domain.Socio`)
 * Mapeada a la tabla `socio` en PostgreSQL con secuencia `primary_sequence` (`allocationSize = 1`, `initialValue = 10000`).
 * **Campos:**
   * `id` (`Long`): Clave primaria local.
@@ -81,7 +84,7 @@ Dado que Keycloak emite eventos después del commit de base de datos y podría d
 
 ## 5. API REST y Seguridad
 
-### Endpoints (`ar.unrn.video.rest.SocioResource`)
+### Endpoints (`ar.unrn.video.membership.rest.SocioResource`)
 
 | Método | Path | Permiso Requerido | Descripción |
 | :--- | :--- | :--- | :--- |
@@ -95,4 +98,4 @@ Dado que Keycloak emite eventos después del commit de base de datos y podría d
 
 * **Vista:** `SociosView.tsx` accesible en `/socios`.
 * **Protección de Ruta:** `PermissionGuard` con permiso `socio-permission-read`.
-* **Actualización en Tiempo Real:** El componente escucha eventos por Server-Sent Events (SSE) desde `/api/notifications/subscribe`. Al recibir un evento administrativo de usuario (`USER.CREATE`, `USER.UPDATE`, `USER.DELETE`), invalida la cache de `@tanstack/react-query`, refrescando la tabla automáticamente sin recargar la página.
+* **Actualización en Tiempo Real:** El componente escucha eventos por Server-Sent Events (SSE) desde `/api/notifications/stream`. Al recibir un evento administrativo de usuario (`USER.CREATE`, `USER.UPDATE`, `USER.DELETE`), invalida la cache de `@tanstack/react-query`, refrescando la tabla automáticamente sin recargar la página.

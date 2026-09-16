@@ -6,7 +6,17 @@ Este documento describe la arquitectura, herramientas, modelo de autorización y
 
 ## 1. Visión General
 
-El servidor MCP permite a agentes de Inteligencia Artificial (Claude Code CLI, Antigravity IDE, agentes locales) interactuar de forma segura con el catálogo de películas y el padrón de socios del videoclub.
+Los servidores MCP permiten a agentes de Inteligencia Artificial (Claude Code CLI, Antigravity IDE, agentes locales) interactuar de forma segura con el catálogo de películas y el padrón de socios del videoclub.
+
+> [!IMPORTANT]
+> **Desde la separación en microservicios hay DOS servidores MCP, no uno.** Cada servicio expone el suyo con sus propias tools:
+>
+> | Servidor | Endpoint | Tools |
+> | :--- | :--- | :--- |
+> | `videoclub-catalog-mcp-server` | `http://catalog:8081/mcp` | `list_movies`, `get_movie`, `search_movies`, `create_movie` |
+> | `videoclub-membership-mcp-server` | `http://membership:8082/mcp` | `list_socios`, `get_socio` |
+>
+> El mecanismo es idéntico al que describe el resto de este documento: cambia el puerto y el reparto de tools. Cada servidor anuncia **su propio** recurso en `/.well-known/oauth-protected-resource`, y el agente mantiene un cliente MCP dedicado por servidor.
 
 ```mermaid
 flowchart TD
@@ -19,12 +29,20 @@ flowchart TD
         KC["Keycloak (:9090)<br/>Realm videoclub"]
     end
 
-    subgraph Server ["Spring Boot Resource Server (:8080)"]
+    subgraph Cat ["catalog-service (:8081)"]
         DISC["/.well-known/oauth-protected-resource<br/>(RFC 9728)"]
         EP["POST /mcp<br/>(Streamable HTTP Stateless)"]
         SEC["Spring Security FilterChain<br/>(Valida Bearer JWT)"]
-        TOOLS["Beans @McpTool + @PreAuthorize<br/>(MovieMcpTools / SocioMcpTools)"]
-        SVC["Servicios de dominio<br/>(MovieService / SocioService)"]
+        TOOLS["MovieMcpTools<br/>@McpTool + @PreAuthorize"]
+        SVC["MovieService"]
+    end
+
+    subgraph Mem ["membership-service (:8082)"]
+        DISC2["/.well-known/oauth-protected-resource"]
+        EP2["POST /mcp"]
+        SEC2["Spring Security FilterChain"]
+        TOOLS2["SocioMcpTools"]
+        SVC2["SocioService"]
     end
 
     CC -->|1. Descubre IdP| DISC
@@ -34,8 +52,10 @@ flowchart TD
     AG -->|Stdio JSON-RPC| BRIDGE[".agents/scripts/mcp-bridge.py"]
     BRIDGE -->|Direct Access Grant| KC
     BRIDGE -->|tools/call + Bearer| EP
+    BRIDGE -->|tools/call + Bearer| EP2
 
     EP --> SEC --> TOOLS --> SVC
+    EP2 --> SEC2 --> TOOLS2 --> SVC2
 ```
 
 ---
@@ -242,11 +262,20 @@ build rojo y no un incidente.
 Utiliza el soporte nativo de descubrimiento **RFC 9728** publicado en `/.well-known/oauth-protected-resource`:
 
 ```bash
+# Un servidor por microservicio: se registran los dos por separado.
 claude mcp add --transport http \
   --client-id videoclub-mcp \
   --callback-port 8090 \
-  videoclub http://localhost:8080/mcp
+  videoclub-catalog http://localhost:8081/mcp
+
+claude mcp add --transport http \
+  --client-id videoclub-mcp \
+  --callback-port 8090 \
+  videoclub-membership http://localhost:8082/mcp
 ```
+
+> [!NOTE]
+> Los puertos `8081` y `8082` son los que publican los servicios al host. Desde dentro de la red de Docker los hostnames son `catalog` y `membership`, que es lo que usa el agente IA.
 
 1. Claude se conecta a `/mcp` sin token y recibe un `401 Unauthorized` con cabecera `WWW-Authenticate`.
 2. Lee `/.well-known/oauth-protected-resource` y descubre la URL del Realm de Keycloak.
@@ -271,7 +300,7 @@ Antigravity no posee un servidor de callbacks OAuth interactivo para conexiones 
         "KEYCLOAK_CLIENT_ID": "videoclub-mcp",
         "KEYCLOAK_USER": "usuarioadmin",
         "KEYCLOAK_PASSWORD": "usuarioadmin",
-        "MCP_URL": "http://localhost:8080/mcp"
+        "MCP_URL": "http://localhost:8081/mcp"
       }
     }
   }

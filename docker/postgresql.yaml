@@ -8,6 +8,9 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-video}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-P4ssword!}
+    volumes:
+      # Sin este mount el init.sql no se ejecuta nunca y las dos bases no existen.
+      - ./postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - 5432:5432
     healthcheck:

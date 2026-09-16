@@ -1,6 +1,13 @@
 # springboot-sso y keycloak
 
-Backend Spring Boot 4 (Java 25) como **OAuth 2.0 Resource Server**, con Keycloak como servidor de identidad y una SPA React 19 como cliente público.
+Dos microservicios Spring Boot 4 (Java 25) como **OAuth 2.0 Resource Servers**, con Keycloak como servidor de identidad y una SPA React 19 como cliente público.
+
+| Proyecto | Puerto | Base de datos | Responsabilidad |
+| :--- | :--- | :--- | :--- |
+| [`catalog-service/`](catalog-service/) | `8081` | `video_catalog` | Catálogo de películas |
+| [`membership-service/`](membership-service/) | `8082` | `video_membership` | Socios, usuarios de Keycloak y notificaciones SSE |
+
+> **Son dos proyectos Maven independientes, no un multi-módulo.** No hay `pom.xml` en la raíz de este repositorio: cada carpeta tiene su propio `pom.xml`, su `mvnw` y su `Dockerfile`, y se abre sola en el IDE — exactamente la forma que genera `start.spring.io`. El razonamiento completo, con lo que se gana y lo que se pierde, está en [`docs/arquitectura-dos-servicios.md`](docs/arquitectura-dos-servicios.md).
 
 > 🧭 **Documentación de Arquitectura Global:** Para la visión integral de la plataforma, topología de servicios, catálogo de ADRs y contratos, consultá [`docs/README.md`](docs/README.md).
 > 📘 **Guía didáctica completa de seguridad**: teoría, flujos, diagramas Mermaid y laboratorio paso a paso en [`docs/seguridad-oauth2-openid-connect-keycloak.md`](docs/seguridad-oauth2-openid-connect-keycloak.md).
@@ -9,7 +16,7 @@ Backend Spring Boot 4 (Java 25) como **OAuth 2.0 Resource Server**, con Keycloak
 
 | Componente | Repositorio | Rol |
 | :--- | :--- | :--- |
-| **Backend Core** | [hmunoz/springboot-sso](https://github.com/hmunoz/springboot-sso) (este repositorio) | Resource Server OAuth2/OIDC, eventos RabbitMQ, servidor MCP |
+| **Backend Core** | [hmunoz/springboot-sso](https://github.com/hmunoz/springboot-sso) (este repositorio) | Dos Resource Servers OAuth2/OIDC (catálogo y membresía), eventos RabbitMQ, servidores MCP |
 | **Frontend SPA** | [hmunoz/react-sso](https://github.com/hmunoz/react-sso) | SPA React 19 + Vite, cliente público con PKCE |
 | **API Gateway** | [munozhoracio/apigateway](https://github.com/munozhoracio/apigateway) | Spring Cloud Gateway (GraalVM Native), punto único de entrada |
 | **Backend Agente IA** | [munozhoracio/agente-videoclub-sso](https://github.com/munozhoracio/agente-videoclub-sso) | Spring AI, microservicio asistente, cliente MCP con Token Relay |
@@ -38,13 +45,29 @@ docker compose -f docker/services.yaml --env-file docker/.env up -d
 
 El realm `videoclub` se importa automáticamente desde `docker/keycloak/realm-export.json`, con sus clientes, grupos, roles y usuarios de prueba.
 
-### 2. Backend
+### 2. Backends
+
+Son dos procesos, cada uno desde su propia carpeta. Hacen falta las dos terminales:
 
 ```bash
-./mvnw spring-boot:run
+cd catalog-service    && ./mvnw spring-boot:run    # :8081
+cd membership-service && ./mvnw spring-boot:run    # :8082
 ```
 
-> `application.yml` tiene activado `spring.docker.compose` con `lifecycle-management: start_only`, así que este comando levanta los contenedores por su cuenta si no están corriendo.
+> A diferencia del monolito anterior, **estos comandos NO levantan la infraestructura**. `spring.docker.compose` viene apagado por defecto en ambos servicios: si estuviera prendido, los dos intentarían levantar el mismo stack al mismo tiempo. Se arranca a mano con el paso 1.
+
+O los dos juntos en contenedores, que es lo que más se parece a producción:
+
+```bash
+docker compose up -d --build
+```
+
+Para correr los tests, también por proyecto:
+
+```bash
+(cd catalog-service    && ./mvnw test)
+(cd membership-service && ./mvnw test)
+```
 
 ### 3. Frontend
 
@@ -59,7 +82,7 @@ Necesita un `.env` propio en su raíz:
 ```bash
 VITE_AUTHORITY=http://localhost:9090/realms/videoclub
 VITE_CLIENT_ID=videoclub-frontend
-VITE_API_BASE_URL=http://localhost:8080
+VITE_API_BASE_URL=http://localhost:9500   # el gateway, que rutea a los dos servicios
 ```
 
 ### Servicios y puertos
@@ -67,15 +90,17 @@ VITE_API_BASE_URL=http://localhost:8080
 | Servicio | URL | Notas |
 | --- | --- | --- |
 | Frontend (SPA) | http://localhost:5173 | React 19 + Vite |
-| Backend | http://localhost:8080 | API REST |
-| Swagger UI | http://localhost:8080/swagger-ui/index.html | Con login OAuth2 + PKCE |
+| catalog-service | http://localhost:8081 | API REST del catálogo (`/movies/**`) |
+| membership-service | http://localhost:8082 | API REST de socios, usuarios y notificaciones |
+| Swagger UI (catálogo) | http://localhost:8081/swagger-ui/index.html | Con login OAuth2 + PKCE |
+| Swagger UI (membresía) | http://localhost:8082/swagger-ui/index.html | Con login OAuth2 + PKCE |
 | Keycloak | http://localhost:9090 | Consola: `/admin/master/console/#/realms/videoclub` |
-| API Gateway | http://localhost:9500 | `/movies/**`, `/api/socios/**`, `/api/users/**`, `/api/notifications/**` → backend; `/api/agent/**` → agent |
+| API Gateway | http://localhost:9500 | `/movies/**` → catalog; `/api/socios/**`, `/api/users/**`, `/api/notifications/**` → membership; `/api/agent/**` → agent |
 | RabbitMQ | http://localhost:15672 | Consola del broker |
 | MailHog | http://localhost:8025 | Bandeja de correo de desarrollo |
-| PostgreSQL | localhost:5432 | Base de películas |
+| PostgreSQL | localhost:5432 | Dos bases: `video_catalog` y `video_membership` |
 
-> **El puerto de Keycloak sale de `docker/.env` (`KEYCLOAK_PORT=9090`).** Todos los valores por defecto están alineados a 9090 (`KC_HOSTNAME` y `ports` en `docker/keycloak.yaml`, `issuer-uri` y `jwk-set-uri` en `src/main/resources/application.yml`), así que si el archivo de entorno no se carga el stack sigue siendo coherente. Si cambiás el puerto, cambialo en los dos lugares: un `KC_HOSTNAME` que no coincida con el puerto publicado deja a Keycloak anunciándose donde no escucha, y todo falla con `401` / *issuer mismatch*.
+> **El puerto de Keycloak sale de `docker/.env` (`KEYCLOAK_PORT=9090`).** Todos los valores por defecto están alineados a 9090 (`KC_HOSTNAME` y `ports` en `docker/keycloak.yaml`, `issuer-uri` y `jwk-set-uri` en el `application.yml` de cada servicio), así que si el archivo de entorno no se carga el stack sigue siendo coherente. Si cambiás el puerto, cambialo en los dos lugares: un `KC_HOSTNAME` que no coincida con el puerto publicado deja a Keycloak anunciándose donde no escucha, y todo falla con `401` / *issuer mismatch*.
 
 ---
 
@@ -128,30 +153,39 @@ curl --request POST 'http://localhost:9090/realms/videoclub/protocol/openid-conn
 
 ### Consumir la API
 
+Todo pasa por el gateway en `:9500`, que rutea cada ruta al servicio que la implementa. El cliente no necesita saber cuál de los dos responde.
+
 ```bash
 # Sin token → 401 Unauthorized
-curl -i http://localhost:8080/movies
+curl -i http://localhost:9500/movies
 
-# Con token → 200 OK
-curl --location 'http://localhost:8080/movies' \
+# Con token → 200 OK (lo sirve catalog-service)
+curl --location 'http://localhost:9500/movies' \
   --header 'Authorization: Bearer <TOKEN>'
 
 # Con token de usuariocliente → 403 Forbidden (application/problem+json)
-curl --location 'http://localhost:8080/api/users' \
+# (lo sirve membership-service, que igual deniega por falta de autoridad)
+curl --location 'http://localhost:9500/api/users' \
   --header 'Authorization: Bearer <TOKEN_CLIENTE>'
 ```
 
+Para pegarle a un servicio salteando el gateway, usá su puerto directo: `:8081` para catálogo y `:8082` para membresía.
+
 ### Endpoints y permisos
 
-| Método y ruta | Autoridad requerida |
-| --- | --- |
-| `GET /movies`, `GET /movies/{id}` | `movie-permission-read` |
-| `POST /movies` | `movie-permission-create` |
-| `PUT /movies/{id}` | `movie-permission-update` |
-| `DELETE /movies/{id}` | `movie-permission-delete` |
-| `GET /api/users` | `user-permission-read` |
-| `POST /api/users` | `user-permission-create` |
-| `GET /metrics/health`, `/api-docs`, `/swagger-ui/**` | público |
+| Método y ruta | Servicio | Autoridad requerida |
+| --- | --- | --- |
+| `GET /movies`, `GET /movies/{id}` | catalog | `movie-permission-read` |
+| `POST /movies` | catalog | `movie-permission-create` |
+| `PUT /movies/{id}` | catalog | `movie-permission-update` |
+| `DELETE /movies/{id}` | catalog | `movie-permission-delete` |
+| `GET /api/socios` | membership | `socio-permission-read` |
+| `GET /api/users` | membership | `user-permission-read` |
+| `POST /api/users` | membership | `user-permission-create` |
+| `GET /api/notifications/stream` | membership | autenticado |
+| `GET /metrics/health`, `/api-docs`, `/swagger-ui/**` | ambos | público |
+
+> Los dos servicios leen el **mismo** claim `resource_access` del token, sin mirar de qué client vino cada rol. La separación en dos procesos no hizo el token más angosto: es `@PreAuthorize`, dentro de cada servicio, lo único que impide que un lector del catálogo lea el padrón de socios. La deuda está documentada en [`docs/arquitectura-dos-servicios.md`](docs/arquitectura-dos-servicios.md#9-keycloak-reparto-de-clients-decisión-d5).
 
 ---
 
@@ -212,7 +246,7 @@ keycloak.user.REGISTER  # solo auto-registro
 
 Para verlo funcionando: crear una cola en http://localhost:15672, atarla a `amq.topic` con `keycloak.#` e iniciar sesión en la SPA.
 
-> Estado actual: Keycloak **publica**, pero el backend todavía **no consume** (no hay `spring-boot-starter-amqp` ni ningún `@RabbitListener`). Queda como extensión del taller.
+> Estado actual: Keycloak publica y **`membership-service` consume**. `KeycloakEventListener` está atado a la cola `keycloak-events` y, ante un alta, baja o modificación de usuario, sincroniza el Socio correspondiente y empuja el evento a los clientes SSE conectados. `catalog-service` todavía no publica ni consume: tiene el starter de AMQP en el classpath a propósito, para que agregar mensajería no obligue a tocar su `pom.xml` a mitad de clase.
 
 ---
 
@@ -232,6 +266,11 @@ Spring Boot **4.1.1** sobre **Java 25**.
 ### Persistencia
 - `spring-boot-starter-data-jpa`: JPA para la persistencia.
 - `postgresql`: driver JDBC.
+
+### Mensajería
+- `spring-boot-starter-amqp`: cliente de RabbitMQ. Está en **los dos** proyectos, aunque hoy solo `membership-service` tenga `@RabbitListener`.
+
+> Traer el starter sin usarlo no es gratis: Spring Boot crea un `RabbitTemplate` y, con él, enciende solo el health indicator de RabbitMQ. Por eso `catalog-service` lo apaga explícitamente con `management.health.rabbit.enabled: false`, con un TODO para borrar esa línea el día que empiece a usar la cola. Es un buen ejemplo de una dependencia que cambia el comportamiento de la aplicación sin que nadie escriba una línea de código.
 
 ### Manejo de errores
 Sin librerías de terceros. Los errores se estandarizan con **RFC 7807 (`application/problem+json`)**, soporte nativo de Spring Boot, mediante `spring.mvc.problemdetails.enabled: true` y un `@RestControllerAdvice` propio en `GlobalExceptionHandler`.
@@ -287,8 +326,8 @@ https://medium.com/@abdurrahmanekr/change-your-keycloak-login-interface-using-wi
 ### spring-boot-with-hibernate-2nd-level-cache-on-redis
 https://medium.com/@shahto/scaling-spring-boot-with-hibernate-2nd-level-cache-on-redis-54d588fc8b06
 
-### Consumidor de eventos de Keycloak en el backend
-Agregar `spring-boot-starter-amqp` y un `@RabbitListener` atado a `keycloak.admin.USER.*`.
+### Mensajería en el catálogo
+`catalog-service` ya tiene `spring-boot-starter-amqp`, pero no declara topología ni publica nada. Falta definir sus propios exchanges y colas — los de `membership-service` pertenecen al bounded context de Socio y no se comparten.
 
 ---
 

@@ -15,28 +15,28 @@ spring:
                 allowCredentials: true
           routes:
             - id: service-catalogo
-              uri: http://backend:8080
+              uri: http://catalog:8081
               predicates:
                 - Path=/movies/**
               filters:
                 - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
 
             - id: service-socios
-              uri: http://backend:8080
+              uri: http://membership:8082
               predicates:
                 - Path=/api/socios/**
               filters:
                 - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
 
             - id: service-users
-              uri: http://backend:8080
+              uri: http://membership:8082
               predicates:
                 - Path=/api/users/**
               filters:
                 - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
 
             - id: service-notificaciones
-              uri: http://backend:8080
+              uri: http://membership:8082
               predicates:
                 - Path=/api/notifications/**
               filters:
