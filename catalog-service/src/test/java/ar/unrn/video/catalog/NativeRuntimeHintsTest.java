@@ -42,9 +42,15 @@ class NativeRuntimeHintsTest {
         // constructor. On a native image an unregistered constructor is invisible, Spring falls back
         // to a no-arg constructor that does not exist, and every POST/PUT of a movie returns 500
         // with "No default constructor found". The JVM never reproduces it.
+        // onConstructor(Constructor) is deprecated for removal since Spring Framework 7.0, in favor
+        // of onConstructorInvocation(Constructor) or onType(Class) (verified with javap against
+        // spring-core-7.0.9.jar: the constructor's Deprecated attribute points to exactly those two
+        // replacements). onConstructorInvocation checks the same INVOKE-level hint that
+        // NativeRuntimeHints registers here (MemberCategory.INVOKE_DECLARED_CONSTRUCTORS), so it is
+        // the semantically equivalent replacement for what this test pins.
         assertTrue(
                 RuntimeHintsPredicates.reflection()
-                        .onConstructor(MovieTitleUnique.MovieTitleUniqueValidator.class
+                        .onConstructorInvocation(MovieTitleUnique.MovieTitleUniqueValidator.class
                                 .getDeclaredConstructors()[0])
                         .test(hints),
                 "the validator's constructor must be reachable by reflection in a native image");

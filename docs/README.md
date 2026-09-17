@@ -105,7 +105,7 @@ Ninguno de los dos necesita estar registrado como client en Keycloak para **vali
 > [!NOTE]
 > **El agente pasó de un cliente MCP a dos.** `McpClientConfiguration` publica ahora cinco beans: un `McpSyncClient` por backend, un `SyncMcpToolCallbackProvider` con `@Qualifier` para cada uno —de modo que `CatalogSubAgent` no pueda ni ver las tools de socios— y un tercero `@Primary` que agrega ambos, que es el que responde `GET /api/agent/tools` con las 6 tools.
 >
-> Cada cliente tiene su **propia** ventana de descubrimiento (`AtomicBoolean` local). Compartir una sola haría que el `initialize()` del segundo cliente encontrara la ventana ya cerrada por el `finally` del primero, y el handshake de arranque fallaría. El filtro por nombre de `AbstractDomainSubAgent` se conserva: con clientes dedicados es redundante en el camino feliz, y ésa es justamente la razón de dejarlo como defensa en profundidad.
+> Cada cliente tiene su **propia** ventana de descubrimiento (`AtomicBoolean` local). Compartir una sola haría que el `initialize()` del segundo cliente encontrara la ventana ya cerrada por el `finally` del primero, y el handshake de arranque fallaría. Los sub-agentes **no tienen una lista de nombres de tools**: cada uno usa todas las tools de su provider dedicado, y el límite del dominio queda en `McpClientConfiguration`. El fail-fast se mantiene si el provider no expone ninguna. Ver la decisión en la sección 10.5 de [MCP-resoruce-prompt-plan.md](MCP-resoruce-prompt-plan.md#105-decisión-los-sub-agentes-ya-no-tienen-una-lista-de-tools-escrita-a-mano).
 
 ---
 
