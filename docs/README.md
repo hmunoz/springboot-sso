@@ -101,6 +101,8 @@ Ninguno de los dos necesita estar registrado como client en Keycloak para **vali
   Emisión de tokens en tiempo real combinada con payload estructurado para que el frontend en React renderice componentes interactivos (fichas de películas, formularios) a medida que el LLM genera respuestas.
 * **[Plan de Streaming AG-UI](https://github.com/munozhoracio/agente-videoclub-sso/blob/main/docs/agui-streaming-plan.md)**:
   Hoja de ruta y diseño técnico del protocolo de streaming de eventos para asistentes conversacionales.
+* **[Plan: Asesor Cinéfilo con un servidor MCP propio sobre TMDB](plan-asesor-cinefilo-tmdb.md)**:
+  Plan sin implementar. Conocimiento de cine de mundo abierto como proyecto MCP nuevo (`cinephile-service`), sub-agente de solo lectura, colaboración entre sub-agentes para el alta asistida de películas, y por qué se descartó el servidor MCP de IMDb.
 
 > [!NOTE]
 > **El agente pasó de un cliente MCP a dos.** `McpClientConfiguration` publica ahora cinco beans: un `McpSyncClient` por backend, un `SyncMcpToolCallbackProvider` con `@Qualifier` para cada uno —de modo que `CatalogSubAgent` no pueda ni ver las tools de socios— y un tercero `@Primary` que agrega ambos, que es el que responde `GET /api/agent/tools` con las 6 tools.
