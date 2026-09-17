@@ -1,9 +1,13 @@
 package ar.unrn.video.catalog.mcp;
 
+import ar.unrn.video.catalog.domain.Genre;
 import ar.unrn.video.catalog.model.MovieDTO;
 import ar.unrn.video.catalog.service.MovieService;
 import ar.unrn.video.catalog.util.NotFoundException;
+import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -119,7 +123,7 @@ public class MovieMcpTools {
             description = "Creates a new movie in the VideoClub catalog. "
                     + "Returns the identifier assigned to the newly created movie. "
                     + "Title must be unique (case-insensitive). "
-                    + "genre must be one of: ACTION, COMEDY, DRAMA, HORROR, SCIENCE_FICTION, ROMANCE, THRILLER, ANIMATION, DOCUMENTARY, FANTASY (or omit). "
+                    + "genre must be one of the values published by the resource catalog://genres (or omit). "
                     + "price is the rental price as a decimal string, e.g. '150.00' (or omit). "
                     + "imageUrl is an optional URL pointing to the cover image."
     )
@@ -127,7 +131,7 @@ public class MovieMcpTools {
     public Long createMovie(
             @McpToolParam(description = "Unique title of the movie", required = true)
             final String title,
-            @McpToolParam(description = "Genre string (optional): ACTION, COMEDY, DRAMA, HORROR, SCIENCE_FICTION, ROMANCE, THRILLER, ANIMATION, DOCUMENTARY, FANTASY", required = false)
+            @McpToolParam(description = "Genre (optional): one of the values published by the resource catalog://genres", required = false)
             final String genre,
             @McpToolParam(description = "Rental price as decimal string, e.g. '150.00' (optional)", required = false)
             final String price,
@@ -136,21 +140,35 @@ public class MovieMcpTools {
         final MovieDTO dto = new MovieDTO();
         dto.setTitle(title);
         if (genre != null && !genre.isBlank()) {
-            try {
-                dto.setGenre(ar.unrn.video.catalog.domain.Genre.valueOf(genre.trim().toUpperCase()));
-            } catch (IllegalArgumentException ignored) {
-                // unknown genre value — leave it null
-            }
+            dto.setGenre(parseGenre(genre));
         }
         if (price != null && !price.isBlank()) {
-            try {
-                dto.setPrice(new java.math.BigDecimal(price.trim()));
-            } catch (NumberFormatException ignored) {
-                // unparseable price — leave it null
-            }
+            dto.setPrice(parsePrice(price));
         }
         dto.setImageUrl(imageUrl != null && !imageUrl.isBlank() ? imageUrl.trim() : null);
         return movieService.create(dto);
+    }
+
+    // An invalid value is rejected, never dropped: dropping it would create the movie with a null
+    // genre or price and report success. The descriptions only point to catalog://genres, so a
+    // client that never reads the resource learns the valid values from this message instead,
+    // built from the enum at runtime so there is still no hardcoded list to drift.
+    private static Genre parseGenre(final String genre) {
+        try {
+            return Genre.valueOf(genre.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            final String valid = Arrays.stream(Genre.values()).map(Genre::name).collect(Collectors.joining(", "));
+            throw new IllegalArgumentException("Unknown genre '" + genre + "'. Valid values: " + valid);
+        }
+    }
+
+    private static BigDecimal parsePrice(final String price) {
+        try {
+            return new BigDecimal(price.trim());
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException(
+                    "Invalid price '" + price + "'. Use a decimal string such as '150.00'");
+        }
     }
 
 }

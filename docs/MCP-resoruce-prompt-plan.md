@@ -349,7 +349,7 @@ El system prompt de `CatalogSubAgent` no es un problema por su tamaño. El probl
 | :--- | :--- | :--- | :--- |
 | Descripción del dominio: *"atendés consultas sobre películas, estrenos, géneros…"* | `catalog-service` | `instructions` del servidor MCP | Pendiente: [T3](#t3-usar-las-instructions-del-servidor-como-descripción-del-dominio) |
 | Procedimiento de alta: *"podés crear películas con `create_movie`"* | `catalog-service` | Publicado por el servidor | **Hecho**: recurso `catalog://procedures/movie-creation` ([T4](#t4-publicar-el-procedimiento-de-alta-desde-el-servidor)) |
-| Géneros válidos | `catalog-service` | Recurso `catalog://genres` | **Hecho** |
+| Géneros válidos | `catalog-service` | Recurso `catalog://genres` | **Hecho**. La descripción de `create_movie` remite al recurso en lugar de repetir la lista (ver 10.4) |
 | Qué tools tiene el sub-agente | `catalog-service` | Lo que expone su servidor MCP | **Hecho**: ver 10.5 |
 | *"Usá siempre las tools"*, tono, *"respondé en español"* | agente | System prompt del agente | Correcto donde está |
 | Formato `json:movies` para las tarjetas (≈40 % del prompt) | agente + frontend | System prompt, pero en un template | Pendiente: [T6](#t6-sacar-el-contrato-de-formato-del-stringformat) |
@@ -397,6 +397,7 @@ Herramientas del catalogo de peliculas del VideoClub UNRN: listado, busqueda, co
 * **Todo lo que llega del servidor entra al system prompt.** Es aceptable porque los servidores son propios. Con un servidor MCP de terceros sería una vía directa para inyectar instrucciones al modelo, y ese contenido tendría que tratarse como no confiable.
 * **Los metadatos de tool son pistas, no seguridad.** Sirven para decidir qué se le ofrece al modelo. Quién puede ejecutar qué lo sigue decidiendo el `@PreAuthorize` del servidor, con el token del usuario.
 * **Si el servidor no responde, el agente degrada, no se cae.** Es lo que ya hace con los géneros: sin la lista, el sub-agente sigue funcionando.
+* **Un recurso no le llega solo al modelo.** Alguien tiene que leerlo: la aplicación (`CatalogSubAgent`, o un nodo de LangGraph con `client.get_resources(...)`), el usuario (`@videoclub:catalog://genres` en Claude Code) o el modelo con las tools de lectura de recursos que agrega Claude Code. El MCP connector de la API de Claude solo soporta tools. Por eso, sacar un dato de la descripción de una tool y dejarlo solo en un recurso es una decisión sobre los clientes. Con `create_movie` se tomó así: la descripción remite a `catalog://genres`, y `McpToolDescriptionsTest` falla si vuelve a aparecer un género escrito a mano. Costo aceptado: un cliente que solo usa tools no conoce los géneros válidos de antemano. Si manda uno inválido, `create_movie` lo rechaza con un error que lista los valores válidos, generado desde `Genre.values()`, y el cliente puede corregir y reintentar. Lo mismo pasa con un precio que no se puede interpretar. Antes esos valores se descartaban en silencio y la película se creaba sin género o sin precio. Lo verifica `McpToolsCreateMovieInputTest`.
 * **Recursos y prompts casi no cambian**, así que se pueden cachear en lugar de pedirlos en cada consulta. `instructions` no necesita caché: ya viene del handshake.
 
 ### 10.5. Decisión: los sub-agentes ya no tienen una lista de tools escrita a mano
