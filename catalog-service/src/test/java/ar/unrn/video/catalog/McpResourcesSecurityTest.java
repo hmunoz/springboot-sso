@@ -1,10 +1,14 @@
 package ar.unrn.video.catalog;
 
 import ar.unrn.video.catalog.domain.Genre;
+import ar.unrn.video.catalog.mcp.MovieMcpPrompts;
 import ar.unrn.video.catalog.mcp.MovieMcpResources;
 import ar.unrn.video.catalog.model.MovieDTO;
 import ar.unrn.video.catalog.service.MovieService;
 import ar.unrn.video.catalog.util.NotFoundException;
+import io.modelcontextprotocol.spec.McpSchema.GetPromptResult;
+import io.modelcontextprotocol.spec.McpSchema.PromptMessage;
+import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -84,7 +88,7 @@ class McpResourcesSecurityTest {
                 .map(spec -> spec.resource().uri())
                 .sorted()
                 .toList();
-        assertEquals(List.of("catalog://genres"), fixedUris);
+        assertEquals(List.of("catalog://genres", "catalog://procedures/movie-creation"), fixedUris);
 
         List<String> templateUris = SyncMcpAnnotationProviders
                 .statelessResourceTemplateSpecifications(List.of(movieMcpResources))
@@ -118,6 +122,45 @@ class McpResourcesSecurityTest {
         // The authority used belongs to the other service on purpose, same as McpToolsSecurityTest.
         assertThrows(AccessDeniedException.class, () -> movieMcpResources.genres());
         assertThrows(AccessDeniedException.class, () -> movieMcpResources.movieCard("10001"));
+        assertThrows(AccessDeniedException.class, () -> movieMcpResources.movieCreationProcedure());
+    }
+
+    @Test
+    @WithMockUser(authorities = "movie-permission-read")
+    @DisplayName("the movie-creation procedure resource allows a caller holding movie-permission-read and renders the key rules")
+    void procedureResourceAllowsMoviePermission() {
+        String procedure = movieMcpResources.movieCreationProcedure();
+        assertTrue(procedure.contains("search_movies"));
+        assertTrue(procedure.contains("catalog://genres"));
+        assertTrue(procedure.contains("create_movie"));
+    }
+
+    @Test
+    @WithAnonymousUser
+    @DisplayName("the movie-creation procedure resource is not reachable by an anonymous caller")
+    void procedureResourceDeniesAnonymousCallers() {
+        assertThrows(AccessDeniedException.class, () -> movieMcpResources.movieCreationProcedure());
+    }
+
+    @Test
+    @WithMockUser(authorities = "movie-permission-read")
+    @DisplayName("the procedure resource and the alta-pelicula prompt render the exact same steps")
+    void procedureResourceAndPromptShareTheSameSteps() {
+        // The regression anchor for the single-source-of-truth requirement: MovieMcpResources and
+        // MovieMcpPrompts must never diverge again the way the resource and the agent's old
+        // hardcoded sentence did. Both render MovieCreationProcedure#steps() verbatim, so the text
+        // starting at step 1 must be byte-identical in the resource and in the prompt.
+        String resourceText = movieMcpResources.movieCreationProcedure();
+        String promptText = textOf(new MovieMcpPrompts().altaPelicula("Cualquiera"));
+
+        String resourceSteps = resourceText.substring(resourceText.indexOf("1. Busca"));
+        String promptSteps = promptText.substring(promptText.indexOf("1. Busca"));
+        assertEquals(resourceSteps, promptSteps);
+    }
+
+    private static String textOf(GetPromptResult result) {
+        PromptMessage message = result.messages().get(0);
+        return ((TextContent) message.content()).text();
     }
 
     @Test

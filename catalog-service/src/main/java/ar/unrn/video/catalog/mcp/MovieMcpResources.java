@@ -65,6 +65,23 @@ public class MovieMcpResources {
     }
 
     @McpResource(
+            uri = "catalog://procedures/movie-creation",
+            name = "movie_creation_procedure",
+            title = "Procedimiento de alta de pelicula",
+            description = "Procedimiento en Markdown para dar de alta una pelicula sin chocar "
+                    + "contra las validaciones del catalogo: buscar antes de crear, generos "
+                    + "validos, formato de precio e imagen opcional.",
+            mimeType = "text/markdown")
+    @PreAuthorize("hasAuthority('movie-permission-read')")
+    public String movieCreationProcedure() {
+        // Single source of truth: MovieCreationProcedure#steps() is the only place these rules
+        // are written. This resource is what CatalogSubAgent injects as context on every call
+        // (the same way it injects catalog://genres), and MovieMcpPrompts#altaPelicula renders
+        // the identical steps for the MCP prompt, so the two can never state different rules.
+        return "# Procedimiento de alta de pelicula\n\n" + MovieCreationProcedure.steps();
+    }
+
+    @McpResource(
             uri = "catalog://movies/{id}",
             name = "movie_card",
             title = "Ficha de pelicula",

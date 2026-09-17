@@ -64,9 +64,10 @@ public class MembershipMcpPrompts {
                 que el alta haya fallado: conviene reintentar la consulta en unos segundos antes \
                 de asumir un error.
                 """;
-        return new GetPromptResult(
-                "Flujo de alta de socio",
-                List.of(new PromptMessage(Role.USER, new TextContent(texto))));
+        return GetPromptResult
+                .builder(List.of(new PromptMessage(Role.USER, TextContent.builder(texto).build())))
+                .description("Flujo de alta de socio")
+                .build();
     }
 
 }

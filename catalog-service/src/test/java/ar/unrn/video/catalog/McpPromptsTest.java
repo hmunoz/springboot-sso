@@ -50,9 +50,11 @@ class McpPromptsTest {
     void encodesTheRealRules() {
         String text = textOf(prompts.altaPelicula("Cualquiera"));
 
-        // Rule 1: search before create, because the title is unique.
+        // Rule 1: search before create, because the title is unique. The step itself no longer
+        // names a specific title — the shared MovieCreationProcedure steps carry no argument.
         assertTrue(text.contains("search_movies"));
         assertTrue(text.contains("unico"));
+        assertTrue(text.contains("Busca primero con `search_movies` usando el titulo"));
 
         // Rule 2: genre must come from the enum, read catalog://genres first.
         assertTrue(text.contains("catalog://genres"));

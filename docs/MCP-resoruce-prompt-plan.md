@@ -236,7 +236,7 @@ if (!this.allUsedToolNames.add(uniqueToolName)) {
 
 El agente usa ese generador sin haberlo elegido: `McpClientConfiguration` no configura ninguno.
 
-**Falla silenciosa:** el nombre resultante (`alt_0_search`) no tiene significado para el modelo, depende del orden en que se descubrieron los servidores, y rompe cualquier filtro por nombre. Si un sub-agente trabajara con dos servidores, `AbstractDomainSubAgent` buscaría `search`, encontraría `alt_0_search` y la descartaría sin error.
+**Falla silenciosa:** el nombre resultante (`alt_0_search`) no tiene significado para el modelo y depende del orden en que se descubrieron los servidores. El modelo recibe una tool que no sabe para qué sirve ni a qué dominio pertenece, y la elige peor o no la elige. Si en algún momento se vuelve a filtrar tools por nombre, ese filtro la descartaría sin ningún error.
 
 **Por qué hoy no ocurre:** las tools llevan el dominio en el nombre (`list_movies`, `list_socios`) y cada sub-agente usa un provider de un solo servidor. Es una convención, no una garantía. Ver la tarea pendiente [T1](#t1-hacer-explícita-la-política-de-nombres-de-tools).
 
@@ -288,7 +288,144 @@ Conectarse a `http://localhost:8081/mcp` (catálogo) o `http://localhost:8082/mc
 
 ---
 
-## 10. Tareas pendientes
+## 10. Cómo se conecta el conocimiento entre los servicios y el agente
+
+Esta sección documenta cómo viaja hoy el conocimiento del dominio desde un servicio hasta el modelo, de quién es cada parte, y qué mecanismos ofrece MCP para que cada servicio publique lo suyo. Las tareas concretas que se desprenden están en la [sección 11](#11-tareas-pendientes).
+
+### 10.1. El recorrido de un recurso, paso a paso
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant ORQ as Orquestador
+    participant SUB as CatalogSubAgent
+    participant KS as McpKnowledgeService
+    participant CLI as McpSyncClient catalog
+    participant SRV as catalog-service /mcp
+    participant RES as MovieMcpResources
+    participant LLM as Modelo
+
+    Note over SRV,RES: Al arrancar, Spring AI escanea @McpResource<br/>y publica catalog://genres en /mcp
+
+    ORQ->>SUB: consulta del usuario, con su JWT en el contexto
+
+    rect rgb(230, 242, 255)
+    Note over SUB,RES: ANTES del modelo: lo decide la aplicación
+    SUB->>KS: readResource("catalog://genres")
+    KS->>CLI: el scheme catalog:// elige este cliente
+    CLI->>SRV: POST /mcp resources/read + JWT del usuario
+    SRV->>RES: @PreAuthorize movie-permission-read
+    RES-->>SRV: Markdown generado desde Genre.values()
+    SRV-->>CLI: ReadResourceResult
+    CLI-->>KS: TextResourceContents
+    KS-->>SUB: texto
+    SUB->>SUB: system prompt fijo + sección de géneros
+    end
+
+    rect rgb(255, 243, 230)
+    Note over SUB,LLM: DURANTE el razonamiento: lo decide el modelo
+    SUB->>LLM: system prompt + todas las tools del provider catalogTools
+    LLM-->>SUB: pide una tool, por ejemplo search_movies
+    SUB->>CLI: la tool se ejecuta por el mismo cliente MCP
+    CLI->>SRV: POST /mcp tools/call + JWT del usuario
+    SRV-->>CLI: resultado
+    CLI-->>SUB: resultado
+    SUB->>LLM: resultado de la tool
+    LLM-->>SUB: respuesta final
+    end
+
+    SUB-->>ORQ: respuesta
+```
+
+**La diferencia que explica todo el diagrama:** el bloque azul ocurre **antes** de que el modelo empiece, en **cada** consulta de catálogo, la necesite o no. El bloque naranja ocurre **durante** el razonamiento, y solo si el modelo decide que necesita una tool.
+
+Por eso en el chat se ven las tools usadas y no se ve la lectura del recurso. No es que el modelo "no la haya usado": nunca la pidió, porque ya la tenía en sus instrucciones al empezar.
+
+### 10.2. De quién es cada parte del system prompt
+
+El system prompt de `CatalogSubAgent` no es un problema por su tamaño. El problema es que **mezcla conocimiento de tres dueños distintos** en un único `String.format` de Java.
+
+| Qué dice hoy el prompt | Dueño | Dónde debería vivir | Estado |
+| :--- | :--- | :--- | :--- |
+| Descripción del dominio: *"atendés consultas sobre películas, estrenos, géneros…"* | `catalog-service` | `instructions` del servidor MCP | Pendiente: [T3](#t3-usar-las-instructions-del-servidor-como-descripción-del-dominio) |
+| Procedimiento de alta: *"podés crear películas con `create_movie`"* | `catalog-service` | Publicado por el servidor | **Hecho**: recurso `catalog://procedures/movie-creation` ([T4](#t4-publicar-el-procedimiento-de-alta-desde-el-servidor)) |
+| Géneros válidos | `catalog-service` | Recurso `catalog://genres` | **Hecho** |
+| Qué tools tiene el sub-agente | `catalog-service` | Lo que expone su servidor MCP | **Hecho**: ver 10.5 |
+| *"Usá siempre las tools"*, tono, *"respondé en español"* | agente | System prompt del agente | Correcto donde está |
+| Formato `json:movies` para las tarjetas (≈40 % del prompt) | agente + frontend | System prompt, pero en un template | Pendiente: [T6](#t6-sacar-el-contrato-de-formato-del-stringformat) |
+
+> [!NOTE]
+> **La duplicación se resolvió.** Los pasos del procedimiento de alta viven en un único lugar de `catalog-service` (`MovieCreationProcedure#steps()`, en `ar.unrn.video.catalog.mcp`), y desde ahí se sirven de dos formas: como el recurso `catalog://procedures/movie-creation`, que `CatalogSubAgent` inyecta en su system prompt igual que `catalog://genres`, y como el prompt `catalog-alta-pelicula`, para el flujo que elige el usuario con un `titulo` concreto. El test de regresión que ancla que no vuelvan a divergir es `McpResourcesSecurityTest.procedureResourceAndPromptShareTheSameSteps`.
+
+### 10.3. Los cuatro mecanismos de MCP para que un servicio publique su conocimiento
+
+MCP no ofrece dos mecanismos para esto, sino **cuatro**. Todas las APIs de la tabla se verificaron contra `mcp-core-2.0.0`.
+
+| Mecanismo | Qué transporta | Cómo lo lee el agente | Costo por consulta | Estado en el proyecto |
+| :--- | :--- | :--- | :--- | :--- |
+| **`instructions`** | Descripción del servidor y de su dominio | `McpSyncClient.getServerInstructions()` | Ninguno: llega en el handshake | El catálogo **ya las envía** (verificado en vivo); el agente las ignora |
+| **Recurso** | Datos y constantes del dominio | `readResource(ReadResourceRequest.builder(uri).build())` | Una llamada; se puede cachear | Implementado y consumido: `catalog://genres`, `catalog://procedures/movie-creation` |
+| **Prompt** | Procedimientos y flujos | `getPrompt(GetPromptRequest.builder(nombre).arguments(args).build())` | Una llamada; se puede cachear | Publicados por ambos servicios; el agente no los consume, por diseño (ver [T4](#t4-publicar-el-procedimiento-de-alta-desde-el-servidor)) |
+| **Metadatos de tool** | Si una tool es de lectura, destructiva o idempotente | `McpSchema.Tool.annotations().readOnlyHint()`, desde un `McpToolFilter` | Ninguno: llegan con el descubrimiento | Declarados en todas las tools (ADR-011); el agente no los usa |
+
+El respaldo de la primera fila se puede comprobar en cualquier momento. Con el stack levantado, este comando hace el handshake `initialize` contra `catalog-service` y muestra las `instructions` que devuelve:
+
+```bash
+TOKEN=$(curl -s -X POST "http://localhost:9090/realms/videoclub/protocol/openid-connect/token" \
+  -d "grant_type=password" -d "client_id=videoclub-frontend" \
+  -d "username=usuarioadmin" -d "password=usuarioadmin" -d "scope=openid" | jq -r .access_token)
+
+docker exec videoclub-catalog-prod curl -s -X POST http://localhost:8081/mcp \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}' \
+  | jq -r .result.instructions
+```
+
+Resultado observado:
+
+```
+Herramientas del catalogo de peliculas del VideoClub UNRN: listado, busqueda, consulta por id y alta de peliculas. No expone datos de socios.
+```
+
+> [!NOTE]
+> En `docker-compose.prod.yml` los servicios no publican su puerto al host, por eso el `curl` corre dentro del contenedor. Con `docker-compose.yml` (desarrollo) el puerto `8081` sí está publicado y alcanza con `curl -s -X POST http://localhost:8081/mcp ...` desde el host. Si el texto cambia, la fuente es `spring.ai.mcp.server.instructions` en `catalog-service/src/main/resources/application.yml`.
+
+### 10.4. Precauciones antes de mover conocimiento al servidor
+
+* **Todo lo que llega del servidor entra al system prompt.** Es aceptable porque los servidores son propios. Con un servidor MCP de terceros sería una vía directa para inyectar instrucciones al modelo, y ese contenido tendría que tratarse como no confiable.
+* **Los metadatos de tool son pistas, no seguridad.** Sirven para decidir qué se le ofrece al modelo. Quién puede ejecutar qué lo sigue decidiendo el `@PreAuthorize` del servidor, con el token del usuario.
+* **Si el servidor no responde, el agente degrada, no se cae.** Es lo que ya hace con los géneros: sin la lista, el sub-agente sigue funcionando.
+* **Recursos y prompts casi no cambian**, así que se pueden cachear en lugar de pedirlos en cada consulta. `instructions` no necesita caché: ya viene del handshake.
+
+### 10.5. Decisión: los sub-agentes ya no tienen una lista de tools escrita a mano
+
+**Estado: implementado.** Revierte la parte de la decisión D3 de [arquitectura-dos-servicios.md](arquitectura-dos-servicios.md) que decía *"se conserva el filtro por nombre de `AbstractDomainSubAgent`"*.
+
+Hasta ahora, `CatalogSubAgent` y `MembershipSubAgent` declaraban la lista de nombres de tools que aceptaban (`CATALOG_TOOL_NAMES`, `MEMBERSHIP_TOOL_NAMES`), y `AbstractDomainSubAgent` descartaba cualquier otra. La lista venía de cuando un único servidor exponía las seis tools y había que separarlas por nombre. Desde la separación en dos servicios, cada sub-agente recibe un provider **dedicado** (`@Qualifier("catalogTools")`, `@Qualifier("membershipTools")`) que solo contiene las tools de su servidor, así que la lista duplicaba información que ya estaba resuelta por configuración y obligaba a tocar el agente cada vez que un servicio agregaba una tool.
+
+Ahora:
+
+* **Cada sub-agente usa todas las tools de su provider dedicado.** El límite del dominio vive en `McpClientConfiguration`: qué cliente respalda a qué provider.
+* **El fail-fast se mantiene.** Si el provider no expone ninguna tool, por ejemplo porque el servidor está caído, el sub-agente falla en lugar de dejar que el modelo responda sin datos reales.
+* **La autorización no cambia.** Cada llamada a una tool viaja con el JWT del usuario y la valida el `@PreAuthorize` del servidor. La lista de nombres nunca fue un control de seguridad.
+
+**Qué lo comprueba.** Las dos afirmaciones de comportamiento están cubiertas por tests en el repositorio `videoclub-agent`, en `src/test/java/ar/unrn/video/agent/subagents/`:
+
+| Afirmación | Tests | Qué verifican |
+| :--- | :--- | :--- |
+| El fail-fast se mantiene | `CatalogSubAgentTest.shouldFailFastWhenNoCatalogToolsDiscovered` y `MembershipSubAgentTest.shouldFailFastWhenNoMembershipToolsDiscovered` | Con un provider **vacío**, el sub-agente lanza `IllegalStateException` en lugar de ejecutar el modelo sin tools. |
+| No hay filtro por nombre | `CatalogSubAgentTest.shouldResolveAllToolsFromDedicatedProviderWithoutFiltering` y `MembershipSubAgentTest.shouldResolveAllToolsFromDedicatedProviderWithoutFiltering` | Una tool llamada `delete_movie`, que nunca figuró en ninguna lista, **tiene que llegar** al sub-agente. |
+
+El segundo par funciona además como **control de regresión**: si alguien vuelve a introducir un filtro por nombre, esos tests fallan en lugar de que una tool desaparezca en silencio.
+
+> [!IMPORTANT]
+> **Costo aceptado:** una tool nueva que se agregue en un servicio le llega al modelo del sub-agente **automáticamente**, sin revisión en el agente. Si el proyecto necesita que las tools de escritura requieran habilitación explícita, la forma de lograrlo sin volver a una lista de nombres está en la tarea [T5](#t5-política-de-tools-por-metadatos-y-no-por-nombre).
+
+---
+
+## 11. Tareas pendientes
 
 ### T1. Hacer explícita la política de nombres de tools
 
@@ -364,3 +501,70 @@ msg.contains("Access Denied")
 #### Qué aporta
 
 **El chat deja de mostrar motivos falsos.** Una tool que no encontró datos deja de aparecer como denegada, y el indicador de tools denegadas vuelve a significar exactamente eso.
+
+### T3. Usar las `instructions` del servidor como descripción del dominio
+
+**Estado:** pendiente.
+
+**Qué:** reemplazar la parte del system prompt de cada sub-agente que describe su dominio por las `instructions` que publica su servidor. Incluye `MembershipSubAgent`, cuyo prompt todavía nombra sus tools a mano (*"get_socio, list_socios"*): después de la sección 10.5 esos nombres ya no los controla el agente, así que es texto que puede quedar desactualizado.
+
+**Cómo:** `catalogMcpClient.getServerInstructions()`. No agrega ninguna llamada: el valor llega en el handshake `initialize`. El texto se escribe en `spring.ai.mcp.server.instructions` del `application.yml` de cada servicio, que pasa a ser la única fuente.
+
+**Qué aporta:** el servicio que es dueño del dominio lo describe una sola vez, y lo reciben igual el agente propio y cualquier cliente MCP externo (Claude Code, MCP Inspector).
+
+**Cuidados:**
+* Si el handshake de arranque falló, por ejemplo porque el servicio estaba caído al iniciar el agente, `getServerInstructions()` devuelve `null` hasta que el cliente se reinicializa en el primer request autenticado. El sub-agente tiene que tolerarlo.
+* El texto actual de `instructions` está pensado como descripción corta para clientes externos y está escrito sin tildes. Antes de usarlo como parte del prompt conviene revisarlo.
+
+### T4. Publicar el procedimiento de alta desde el servidor
+
+**Estado:** hecho. Se eligió el camino del **recurso**: `catalog://procedures/movie-creation`, sin argumentos, inyectado por `CatalogSubAgent` igual que `catalog://genres`. Es la opción correcta para este caso porque el procedimiento de alta es contexto que el sub-agente necesita tener siempre disponible, no un flujo que el usuario elige explícitamente con un título en mano — que es justamente lo que exige el prompt `catalog-alta-pelicula`, que queda publicado pero sin consumidor en el agente, por diseño.
+
+**Qué:** eliminar del prompt del agente la frase *"podés crear películas con `create_movie`"* y usar el procedimiento que ya publica `catalog-service`, con las reglas reales del dominio.
+
+**La decisión: prompt MCP o recurso.** El prompt `catalog-alta-pelicula` existe, pero tiene el argumento `titulo` **obligatorio**. Y el system prompt se arma **antes** de que el modelo razone, cuando todavía no se sabe si el usuario va a pedir un alta ni con qué título. Hay dos caminos:
+
+| Camino | Cómo | Cuándo conviene |
+| :--- | :--- | :--- |
+| **Recurso** | Publicar el procedimiento como `catalog://procedures/movie-creation`, sin argumentos, e inyectarlo igual que los géneros | Cuando es contexto que el agente debe tener siempre. **Es el caso de este sub-agente.** |
+| **Prompt MCP** | `getPrompt(GetPromptRequest.builder("catalog-alta-pelicula").arguments(Map.of("titulo", t)).build())` | Cuando lo elige el **usuario** como un flujo guiado, con datos que ya conoce. Es el uso para el que MCP define los prompts. |
+
+Esta tarea es el mejor ejemplo del proyecto para distinguir las primitivas de la sección 1: **un prompt MCP lo elige quien usa el cliente; un recurso lo inyecta la aplicación.**
+
+**Relación con la decisión de la sección 5:** `McpKnowledgeService.getPrompt` se eliminó por no tener consumidor. Si se elige el camino del prompt, vuelve **con** un consumidor, que es exactamente el criterio que dejó esa decisión.
+
+### T5. Política de tools por metadatos y no por nombre
+
+**Estado:** pendiente y **opcional**. Solo hace falta si el proyecto quiere que las tools de escritura no lleguen al modelo automáticamente (ver el costo aceptado en 10.5).
+
+**Qué:** configurar un `McpToolFilter` en el provider de cada sub-agente que deje pasar las tools de solo lectura y exija habilitación explícita para las de escritura.
+
+**Cómo:**
+
+```java
+SyncMcpToolCallbackProvider.builder()
+        .mcpClients(catalogMcpClient)
+        .toolFilter((connection, tool) ->
+                tool.annotations() != null && Boolean.TRUE.equals(tool.annotations().readOnlyHint()))
+        .build();
+```
+
+Las tools ya declaran esos metadatos (ADR-011): `list_movies`, `get_movie` y `search_movies` con `readOnlyHint = true`, y `create_movie` con `readOnlyHint = false`.
+
+**Cuidados:**
+* Los metadatos son pistas que declara el servidor, no un control de seguridad (ver 10.4).
+* Respetar la firma de `McpToolFilter`: el segundo parámetro es un `McpSchema.Tool`, no un nombre. Ver la advertencia de [T1](#t1-hacer-explícita-la-política-de-nombres-de-tools).
+
+### T6. Sacar el contrato de formato del `String.format`
+
+**Estado:** pendiente.
+
+**Qué:** mover la regla de formato de Generative UI (el bloque `json:movies` que el frontend convierte en tarjetas, cerca del 40 % del system prompt de `CatalogSubAgent`) a un template versionado en `src/main/resources` del **agente**.
+
+**Cómo:** `SystemPromptTemplate` de Spring AI, disponible en `spring-ai-model-2.0.1`, cargando el archivo como `Resource`.
+
+**Qué aporta:** el texto se lee y se revisa como texto, no como una cadena de Java con comillas y `\n` escapados, y se puede cambiar sin tocar la lógica.
+
+> [!CAUTION]
+> **Este conocimiento no va al servidor.** El formato `json:movies` es un contrato entre el agente y el frontend: `catalog-service` no sabe que existen las tarjetas de React. Publicarlo desde el servicio acoplaría el dominio a una decisión de interfaz, y cambiar la UI obligaría a redesplegar el catálogo.
+

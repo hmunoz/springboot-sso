@@ -13,8 +13,12 @@ import org.springframework.stereotype.Component;
  * MCP prompt exposing the procedure to create a movie without tripping the catalog's own
  * validations.
  *
- * <p>Every rule this prompt states is verified against the code that enforces it and nothing
- * else:
+ * <p>The steps themselves live in exactly one place, {@link MovieCreationProcedure#steps()},
+ * shared verbatim with the resource {@code catalog://procedures/movie-creation} published by
+ * {@link MovieMcpResources}. This method only adds an intro naming a concrete {@code titulo},
+ * which the resource — having no arguments — cannot do. See {@link MovieCreationProcedure} for why
+ * that split exists and for the rule-by-rule verification against the code that enforces each
+ * rule:
  *
  * <ul>
  *   <li>the title is unique ({@code Movie.title} carries {@code unique = true}, and
@@ -56,19 +60,11 @@ public class MovieMcpPrompts {
                 Vas a dar de alta la pelicula "%s" en el catalogo del VideoClub. Segui estos \
                 pasos en orden:
 
-                1. Busca primero con `search_movies` usando "%s" (o una parte del titulo). El \
-                titulo es unico: si ya existe una pelicula con ese nombre (sin distinguir \
-                mayusculas), `create_movie` devuelve un error 400.
-                2. Lee el recurso `catalog://genres` antes de elegir un genero. El campo `genre` \
-                solo acepta uno de esos valores exactos, o se puede omitir.
-                3. `price` es opcional. Cuando se informa, es un decimal con dos posiciones, por \
-                ejemplo "150.00", y no puede ser negativo.
-                4. `imageUrl` es opcional; se puede omitir si no hay imagen de portada.
-                5. Recien con esos datos confirmados, llama a `create_movie`.
-                """.formatted(titulo, titulo);
-        return new GetPromptResult(
-                "Procedimiento de alta de pelicula",
-                List.of(new PromptMessage(Role.USER, new TextContent(texto))));
+                %s""".formatted(titulo, MovieCreationProcedure.steps());
+        return GetPromptResult
+                .builder(List.of(new PromptMessage(Role.USER, TextContent.builder(texto).build())))
+                .description("Procedimiento de alta de pelicula")
+                .build();
     }
 
 }
