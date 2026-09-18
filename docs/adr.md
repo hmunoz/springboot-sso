@@ -399,7 +399,7 @@ flowchart LR
     subgraph Bus ["Bus de Mensajería RabbitMQ"]
         Ex["videoclub.events<br/>(Topic Exchange)"]
         Queue["cart.movie-events.queue<br/>(Durable, Binding: movie.#)"]
-        Ex -->|Routing Key:<br/>movie.price-updated| Queue
+        Ex -->|"Routing Key:<br/>movie.price-updated"| Queue
     end
 
     subgraph CartContext ["Vertical Carrito (cart-service :8083)"]
@@ -412,7 +412,7 @@ flowchart LR
         CartDB -.->|Lectura sin red| CartUI
     end
 
-    CatApp -->|2. Publica Evento Rico (ECST)| Ex
+    CatApp -->|"2. Publica Evento Rico (ECST)"| Ex
 ```
 
 1. **Eventos Portadores de Estado (Event-Carried State Transfer):**
@@ -448,6 +448,32 @@ Para mantener los ejercicios pedagógicos y accesibles sin sobrecargar a los est
    * **Alternativa Simple (Flag de Modificación):** Agregar un atributo en la entidad o ítem del carrito (ej: `has_price_updates = true` o `price_modified = true`). Si el precio cambió mientras el usuario preparaba su pedido, la UI muestra un badge o advertencia.
    * **Validación al Pagar (Checkout Warning):** Al momento de presionar "Confirmar Alquiler" o realizar el pago, si existe dicho flag de advertencia, el sistema puede solicitar confirmación explícita del nuevo total antes de procesar el cobro.
 
+   ```mermaid
+   sequenceDiagram
+       autonumber
+       actor Admin as Administrador
+       participant Cat as CatalogService (:8081)
+       participant Bus as RabbitMQ (videoclub.events)
+       participant Cart as CartService (:8083)
+       participant DB as DB (video_cart)
+       participant SPA as Frontend SPA (:5173)
+       participant Order as OrderService (:8084)
+
+       Admin->>Cat: PUT /api/movies/42 (price = 650)
+       Cat->>Bus: Publica MoviePriceUpdatedEvent (ECST)
+       Bus->>Cart: Consume de cart.movie-events.queue
+       Cart->>DB: UPDATE cart_item SET unit_price=650, has_price_update=true
+       Cart->>SPA: Push SSE (/api/notifications/stream) "Precio actualizado a $650"
+       Note over SPA: La UI actualiza la vista y muestra badge de alerta
+       
+       SPA->>Cart: POST /api/cart/checkout (Confirmar Alquiler)
+       alt Si has_price_update es true
+           Cart-->>SPA: 409 Conflict / Warning: "El total cambió a $650. ¿Desea confirmar?"
+           SPA->>Cart: POST /api/cart/checkout?confirmed=true
+       end
+       Cart->>Order: Crea orden con precio inmutable ($650)
+   ```
+
 2. **Control de Idempotencia y Mensajes Desordenados:**
    * **Nivel Básico (Recomendado para comenzar):** Ejecutar un `UPDATE` directo por `movie_id`:
 
@@ -478,6 +504,33 @@ Para mantener los ejercicios pedagógicos y accesibles sin sobrecargar a los est
        1. **Escritura Atómica Local:** En la misma transacción ACID de PostgreSQL, se actualiza la entidad `movie` y se inserta un registro en una tabla local `outbox_events` (`id`, `aggregate_type`, `payload_json`, `created_at`, `status = 'PENDING'`). O se guardan ambos o ninguno.
        2. **Relay Asíncrono Desacoplado:** Un proceso en segundo plano (un worker `@Scheduled` con bloqueo optimista o una herramienta de CDC como Debezium leyendo el WAL de PostgreSQL) consulta los eventos `PENDING`.
        3. **Garantía At-Least-Once:** El worker publica a RabbitMQ requiriendo *Publisher Confirms*. Recién cuando el broker responde `ACK`, el evento se marca como `PUBLISHED` (o se elimina). Si RabbitMQ está caído durante horas, los eventos permanecen seguros en PostgreSQL y se despachan al restablecerse el servicio.
+
+     ```mermaid
+     sequenceDiagram
+         autonumber
+         actor Admin as Administrador
+         participant Cat as MovieService
+         participant PG as PostgreSQL (video_catalog)
+         participant Relay as OutboxRelay (@Scheduled / CDC)
+         participant Rabbit as RabbitMQ (Exchange)
+
+         Admin->>Cat: updatePrice(42, 650.00)
+         
+         Note over Cat, PG: Transacción ACID Local (100% Atómica)
+         Cat->>PG: BEGIN TRANSACTION
+         Cat->>PG: UPDATE movie SET price = 650.00 WHERE id = 42
+         Cat->>PG: INSERT INTO outbox_events (id, aggregate_id, payload, status) VALUES (101, 42, '{...}', 'PENDING')
+         Cat->>PG: COMMIT TRANSACTION
+         Cat-->>Admin: 200 OK (Precio actualizado)
+
+         loop Cada intervalo (Proceso Asíncrono Desacoplado)
+             Relay->>PG: SELECT * FROM outbox_events WHERE status = 'PENDING' LIMIT 50
+             PG-->>Relay: [Event 101: MoviePriceUpdated(42)]
+             Relay->>Rabbit: basicPublish(videoclub.events, "movie.price-updated", payload)
+             Rabbit-->>Relay: ACK (Publisher Confirm)
+             Relay->>PG: UPDATE outbox_events SET status = 'PUBLISHED' WHERE id = 101
+         end
+     ```
 
 4. **Inmutabilidad en Checkout:**
    * Al momento de confirmar la transacción final (`order-service`), el precio se copia en el registro histórico de la orden (`order_item.price_at_purchase`), desligándolo de futuros cambios en el catálogo.
