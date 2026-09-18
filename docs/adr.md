@@ -20,6 +20,7 @@ Este documento centraliza todos los **Architecture Decision Records (ADR)** del 
 * [ADR-012: Bridge Stdio con Direct Access Grants para Clientes No Interactivos (Antigravity)](#adr-012-bridge-stdio-con-direct-access-grants-para-clientes-no-interactivos-antigravity)
 * [ADR-013: Un Esquema por Microservicio (Database per Service)](#adr-013-un-esquema-por-microservicio-database-per-service)
 * [ADR-014: Comunicación Este-Oeste Solo por Bus de Mensajes, No por HTTP](#adr-014-comunicación-este-oeste-solo-por-bus-de-mensajes-no-por-http)
+* [ADR-015: Sincronización entre Verticales mediante Event-Carried State Transfer (ECST) y Réplica de Proyecciones](#adr-015-sincronización-entre-verticales-mediante-event-carried-state-transfer-ecst-y-réplica-de-proyecciones)
 
 ---
 
@@ -361,3 +362,152 @@ Distinción explícita de los dos ejes:
 
 > [!NOTE]
 > **El servidor MCP no viola esta regla.** `catalog:8081/mcp` y `membership:8082/mcp` los consume el agente IA, que es un **cliente** del ecosistema, no un servicio de dominio par. Ese tráfico es norte-sur aunque ocurra dentro de la red de Docker.
+
+---
+
+### ADR-015: Sincronización entre Verticales mediante Event-Carried State Transfer (ECST) y Réplica de Proyecciones
+
+* **Estado:** Aceptado (Patrón de Integración para Nuevas Verticales)
+* **Fecha:** Septiembre 2026
+* **Aplica a:** Nuevos servicios de negocio (`cart-service`, `order-service`, `catalog-service`, etc.)
+* **Complementa a:** [ADR-013](#adr-013-un-esquema-por-microservicio-database-per-service) y [ADR-014](#adr-014-comunicación-este-oeste-solo-por-bus-de-mensajes-no-por-http)
+
+#### Contexto
+Al diseñar nuevas verticales de negocio en la plataforma, surgen dependencias de datos entre dominios. El caso canónico del taller es la interacción entre el **Catálogo de Películas** y el **Carrito de Compras**:
+
+1. `catalog-service` es el dueño de la entidad `Movie` y fija el precio unitario (`price`).
+2. `cart-service` (o módulo de pedidos/alquileres) gestiona los carritos de los usuarios y necesita mostrar los títulos seleccionados, calcular subtotales y totalizar importes.
+3. Si un administrador actualiza el precio de una película en el catálogo (`Movie.price`), los carritos activos que contengan dicho ítem deben reflejar el precio actualizado.
+
+Siguiendo las restricciones arquitectónicas ya establecidas:
+* **No se puede consultar la base de datos de Catálogo:** cada microservicio posee su propio esquema privado (`video_catalog`, `video_cart`) y no hay credenciales compartidas ([ADR-013](#adr-013-un-esquema-por-microservicio-database-per-service)).
+* **No se pueden hacer llamadas REST sincrónicas entre verticales:** `cart-service` no puede invocar por HTTP `GET http://catalog:8081/movies/{id}` para renderizar el carrito ([ADR-014](#adr-014-comunicación-este-oeste-solo-por-bus-de-mensajes-no-por-http)). Hacerlo introduciría acoplamiento temporal (si Catálogo cae, el Carrito deja de funcionar), latencia en cascada y convertiría los servicios en un monolito distribuido.
+* En [ADR-001](#adr-001-topología-de-doble-exchange-en-rabbitmq-keycloakevents-vs-videoclubevents) a [ADR-003](#adr-003-anti-corruption-layer-acl-para-aislar-el-spi-de-keycloak) se resolvió la sincronización desde Keycloak hacia Socios. Este ADR resuelve la sincronización **entre verticales de dominio autónomas**.
+
+#### Decisión
+
+Implementar el patrón **Event-Carried State Transfer (ECST)** junto con una **Proyección Local (Read Model Desnormalizado)** en la vertical consumidora:
+
+```mermaid
+flowchart LR
+    subgraph CatContext ["Vertical Catálogo (catalog-service :8081)"]
+        CatDB[("video_catalog<br/>(Owner de Movie)")]
+        CatApp["MovieService<br/>updatePrice(id, newPrice)"]
+        CatApp -->|1. UPDATE| CatDB
+    end
+
+    subgraph Bus ["Bus de Mensajería RabbitMQ"]
+        Ex["videoclub.events<br/>(Topic Exchange)"]
+        Queue["cart.movie-events.queue<br/>(Durable, Binding: movie.#)"]
+        Ex -->|Routing Key:<br/>movie.price-updated| Queue
+    end
+
+    subgraph CartContext ["Vertical Carrito (cart-service :8083)"]
+        Listener["MovieEventListener<br/>@RabbitListener"]
+        CartDB[("video_cart<br/>(Proyección cart_item)")]
+        CartUI["CartService / UI<br/>Lectura 100% Local"]
+        
+        Queue -->|3. Consume evento| Listener
+        Listener -->|4. UPDATE precio y flag| CartDB
+        CartDB -.->|Lectura sin red| CartUI
+    end
+
+    CatApp -->|2. Publica Evento Rico (ECST)| Ex
+```
+
+1. **Eventos Portadores de Estado (Event-Carried State Transfer):**
+   * El productor (`catalog-service`) publica en el exchange `videoclub.events` un evento con los datos requeridos por los consumidores:
+
+   ```json
+   {
+     "eventId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+     "eventType": "MoviePriceUpdatedEvent",
+     "occurredAt": "2026-09-18T10:15:30Z",
+     "movieId": 42,
+     "title": "Inception",
+     "previousPrice": 500.00,
+     "newPrice": 650.00
+   }
+   ```
+
+   * **Routing Key:** `movie.price-updated` (o `movie.updated`).
+   * Al viajar los datos dentro del mensaje, el consumidor **no necesita realizar ninguna llamada de vuelta (*callback/query*)** hacia `catalog-service`.
+
+2. **Proyección Local y Réplica Mínima:**
+   * `cart-service` almacena en su esquema `video_cart` una tabla de proyección o réplica desnormalizada (ej: tabla `cart_item` con columnas `movie_id`, `movie_title_cached`, `unit_price`).
+   * Cada lectura o cotización del carrito es una **consulta relacional local**. `cart-service` no toca la red para calcular totales.
+
+---
+
+#### Recomendaciones de Implementación y Experiencia de Usuario (Opcionales para el Taller)
+
+Para mantener los ejercicios pedagógicos y accesibles sin sobrecargar a los estudiantes con complejidades distribuidas, se sugieren las siguientes alternativas graduales:
+
+1. **Notificaciones Push y Alertas en el Carrito:**
+   * **Integración con Notificaciones Push:** Dado que la plataforma ya dispone de un canal de notificaciones en tiempo real vía Server-Sent Events (`/api/notifications/stream`), el consumidor puede emitir un evento que envíe un push al usuario conectado: *"El precio de 'Inception' en tu carrito se ha actualizado a $650"*.
+   * **Alternativa Simple (Flag de Modificación):** Agregar un atributo en la entidad o ítem del carrito (ej: `has_price_updates = true` o `price_modified = true`). Si el precio cambió mientras el usuario preparaba su pedido, la UI muestra un badge o advertencia.
+   * **Validación al Pagar (Checkout Warning):** Al momento de presionar "Confirmar Alquiler" o realizar el pago, si existe dicho flag de advertencia, el sistema puede solicitar confirmación explícita del nuevo total antes de procesar el cobro.
+
+2. **Control de Idempotencia y Mensajes Desordenados:**
+   * **Nivel Básico (Recomendado para comenzar):** Ejecutar un `UPDATE` directo por `movie_id`:
+
+     ```sql
+     UPDATE cart_item SET unit_price = :newPrice WHERE movie_id = :movieId;
+     ```
+
+   * **Nivel Avanzado (Evolución de producción):** Si se desea prevenir la llegada de mensajes viejos fuera de orden, se puede persistir `last_price_update = event.occurredAt` y aplicar una condición de guarda:
+
+     ```sql
+     UPDATE cart_item 
+     SET unit_price = :newPrice, last_price_update = :occurredAt 
+     WHERE movie_id = :movieId AND (last_price_update IS NULL OR last_price_update < :occurredAt);
+     ```
+
+3. **Resiliencia en el Productor: El Problema de la Doble Escritura (*Dual-Write*) y Alternativas:**
+   * **El mito de `@Transactional` con Spring AMQP:**
+     Anotar un método con `@Transactional` e invocar `rabbitTemplate.convertAndSend()` **no garantiza atomicidad**. Spring gestiona la transacción relacional en PostgreSQL mediante `JpaTransactionManager` (vía JDBC), mientras que RabbitMQ opera con canales AMQP independientes. **No existe una transacción distribuida Two-Phase Commit (2PC / XA)** que coordine a ambos de forma nativa.
+   * **Los dos modos de fallo del Dual-Write:**
+     * **Fallo A — Evento Fantasma (Publicación dentro de la transacción):** Si el mensaje se despacha a RabbitMQ dentro del método transaccional y luego PostgreSQL falla al hacer `COMMIT` (por violación de unicidad, timeout de lock o caída de red), el mensaje ya fue entregado a los consumidores. La vertical de Carrito actualizará un precio que en Catálogo nunca se guardó.
+     * **Fallo B — Evento Perdido (Publicación inmediata post-commit):** Si la base de datos commitea con éxito pero en ese instante exacto RabbitMQ no responde, hay un corte de red o el contenedor JVM sufre un crash/reinicio (OOM / *kill*), el evento jamás se despacha. La base de datos quedó en $650, pero el Carrito retiene $500 indefinidamente.
+   * **Nivel Mínimo Viable (Recomendado para el Taller):**
+     * Desacoplar la publicación del ciclo transaccional usando eventos de aplicación de Spring y `@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)`.
+     * **Mecanismo:** El servicio publica un evento interno de Spring (`eventPublisher.publishEvent(...)`). El listener de Spring solo intenta enviar a RabbitMQ **una vez que PostgreSQL confirmó el `COMMIT`**.
+     * **Alcance:** Elimina al 100% los *eventos fantasma*. Si RabbitMQ sufre un fallo transitorio, se mitiga con un retry template básico. Es la solución recomendada para el taller por su simplicidad (sin tablas extra ni workers).
+   * **Nivel de Producción (Transactional Outbox Pattern):**
+     * Para eliminar el riesgo de *eventos perdidos* ante caídas severas del broker o de la aplicación, se adopta el patrón Outbox:
+       1. **Escritura Atómica Local:** En la misma transacción ACID de PostgreSQL, se actualiza la entidad `movie` y se inserta un registro en una tabla local `outbox_events` (`id`, `aggregate_type`, `payload_json`, `created_at`, `status = 'PENDING'`). O se guardan ambos o ninguno.
+       2. **Relay Asíncrono Desacoplado:** Un proceso en segundo plano (un worker `@Scheduled` con bloqueo optimista o una herramienta de CDC como Debezium leyendo el WAL de PostgreSQL) consulta los eventos `PENDING`.
+       3. **Garantía At-Least-Once:** El worker publica a RabbitMQ requiriendo *Publisher Confirms*. Recién cuando el broker responde `ACK`, el evento se marca como `PUBLISHED` (o se elimina). Si RabbitMQ está caído durante horas, los eventos permanecen seguros en PostgreSQL y se despachan al restablecerse el servicio.
+
+4. **Inmutabilidad en Checkout:**
+   * Al momento de confirmar la transacción final (`order-service`), el precio se copia en el registro histórico de la orden (`order_item.price_at_purchase`), desligándolo de futuros cambios en el catálogo.
+
+#### Justificación y Opciones Evaluadas
+
+| Enfoque | Pros | Contras | Dictamen |
+| :--- | :--- | :--- | :--- |
+| **A. Consulta REST Sincrónica** (`GET /movies/{id}`) | Sencillo de programar inicialmente. | Viola ADR-014. Acoplamiento temporal; si Catálogo cae, el Carrito falla. Latencia multiplicada por cada ítem. | ❌ Rechazado |
+| **B. Base de Datos Compartida o JOIN SQL** | Cero duplicación de datos. | Viola ADR-013. Destruye la independencia de despliegue y el principio Database per Service. | ❌ Rechazado |
+| **C. Thin Events (Solo ID) + REST Callback** | Payload de evento muy liviano. | El consumidor recibe el ID y de inmediato hace un GET HTTP para pedir el precio. Mismos problemas que la Opción A, sumando riesgo de *thundering herd*. | ❌ Rechazado |
+| **D. Event-Carried State Transfer + Proyección Local** | **Autonomía total**, máxima disponibilidad, latencia de lectura cero, desacoplamiento absoluto de servicios. | Duplicación controlada de atributos y consistencia eventual. | ✅ **Aceptado** |
+| **E. Transactional Outbox (en Productor)** | Garantía matemática de cero eventos perdidos y cero eventos fantasma (*at-least-once*). | Requiere tabla outbox y worker asíncrono o CDC (Debezium). | 💡 **Recomendado para Producción** (Opcional en Taller) |
+
+#### Consecuencias
+
+* **Positivas:**
+  * **Resiliencia Extrema:** Si `catalog-service` está caído por mantenimiento o fallos, `cart-service` continúa funcionando al 100%: los usuarios pueden ver sus carritos, agregar ítems y calcular montos sin percibir el corte.
+  * **Rendimiento Óptimo:** La respuesta del carrito es inmediata al ser una consulta SQL local, sin esperas de red ni timeouts de microservicios externos.
+  * **Crecimiento Orgánico del Ecosistema:** `catalog-service` no sabe ni le interesa qué servicios consumen `movie.price-updated`. Si mañana se suma `marketing-service` para enviar correos de "Película en oferta", simplemente suscribe una nueva cola al exchange `videoclub.events`.
+* **Trade-offs:**
+  * **Consistencia Eventual:** Existe una ventana temporal de milisegundos en la cual el precio en el Catálogo es nuevo pero el Carrito aún no procesó el mensaje de RabbitMQ. Esto es admisible y se concilia antes del checkout.
+  * **Duplicación de Datos Intencional:** Ciertos campos (`title`, `price`) se almacenan tanto en `video_catalog` como en `video_cart`. La duplicación es un costo aceptado para ganar desacoplamiento y velocidad.
+  * **Lógica Adicional en el Consumidor:** Requiere modelar colas con DLQ, listeners idempotentes y control de mensajes repetidos.
+
+#### Referencias Bibliográficas y Conceptuales
+
+* **Martin Fowler (2017) — *What do you mean by "Event-Driven"?*:**
+  [https://martinfowler.com/articles/201701-event-driven.html](https://martinfowler.com/articles/201701-event-driven.html). Formalización canónica de los cuatro patrones orientados a eventos (*Event Notification*, *Event-Carried State Transfer*, *Event Sourcing*, *CQRS*), fundamentando por qué los eventos enriquecidos eliminan el acoplamiento temporal de red hacia el productor.
+* **Chris Richardson — *Microservices Patterns* (Manning / microservices.io):**
+  Capítulo 3 (Comunicación Inter-servicio Asíncrona) y Capítulo 4 (Transactional Outbox Pattern para evitar la pérdida de eventos por *Dual-Write*).
+* **Pat Helland — *Data on the Outside vs. Data on the Inside*:**
+  Principio arquitectónico de datos inmutables y de referencia compartidos en ecosistemas distribuidos, en contraste con los datos privados transaccionales de cada agregado.

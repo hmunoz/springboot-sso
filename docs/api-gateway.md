@@ -6,30 +6,66 @@ Este documento describe la arquitectura, decisiones de diseño, configuración d
 
 ## 1. Rol y Propósito del API Gateway
 
-El API Gateway actúa como el **punto único de entrada (Single Point of Entry)** para los clientes externos (como la aplicación SPA en React) hacia los servicios internos del backend.
+El API Gateway actúa como el **punto único de entrada perimetral (Single Point of Entry)** para los clientes externos (como la aplicación SPA en React) hacia los servicios internos del backend. Gestiona exclusivamente el tráfico **Norte-Sur**.
 
 ```mermaid
 flowchart TD
-    SPA["Frontend SPA (React)<br/>http://localhost:5173"]
-    KC["Keycloak (IdP / Autoridad)<br/>http://localhost:9090"]
-    GW["Spring Cloud Gateway<br/>http://localhost:9500"]
-    CAT["catalog-service<br/>http://catalog:8081"]
-    MEM["membership-service<br/>http://membership:8082"]
-    AG["Agente IA<br/>http://agent:8085"]
+    subgraph Exterior ["Tráfico Norte-Sur (Vía API Gateway)"]
+        SPA["Frontend SPA (React)<br/>http://localhost:5173"]
+        GW["Spring Cloud Gateway<br/>http://localhost:9500"]
+    end
 
-    SPA -- "1. Autenticación directa (OIDC)" --> KC
-    SPA -- "2. Peticiones con Bearer JWT" --> GW
+    subgraph Identity ["Plano de Identidad (Independiente)"]
+        KC["Keycloak (IdP / Autoridad)<br/>http://localhost:9090"]
+    end
+
+    subgraph Internal ["Tráfico Este-Oeste / Red Interna (SIN API Gateway)"]
+        AG["videoclub-agent<br/>http://agent:8085"]
+        CAT["catalog-service<br/>http://catalog:8081"]
+        MEM["membership-service<br/>http://membership:8082"]
+        RABBIT[("RabbitMQ Message Broker<br/>amqp://rabbitmq:5672")]
+    end
+
+    SPA -- "1. Autenticación OIDC (Directo)" --> KC
+    SPA -- "2. Peticiones HTTP con Bearer JWT" --> GW
+    
     GW -- "/movies/**" --> CAT
     GW -- "/api/socios/**" --> MEM
     GW -- "/api/users/**" --> MEM
     GW -- "/api/notifications/** (SSE)" --> MEM
     GW -- "/api/agent/**" --> AG
+
+    AG -.->|"Llamada MCP directa (Streamable HTTP)<br/>POST http://catalog:8081/mcp"| CAT
+    AG -.->|"Llamada MCP directa (Streamable HTTP)<br/>POST http://membership:8082/mcp"| MEM
+    CAT <==>|"Eventos de dominio asíncronos"| RABBIT
+    MEM <==>|"Eventos de dominio asíncronos"| RABBIT
 ```
 
 ### Principios Fundamentales
+
 1. **Desacoplamiento Topológico:** Los clientes frontales desconocen direcciones IP, puertos internos y topología de red de los microservicios.
-2. **Fachada Orientada a Recursos (Resource-Oriented Facade):** Las URLs expuestas al frontend representan entidades del dominio (`/movies`, `/api/socios`), no nombres de servicios o contenedores.
+2. **Fachada Orientada a Recursos (Resource-Oriented Facade):** Las URLs expuestas al frontend representan entidades del dominio (`/movies`, `/api/socios`, `/api/agent`), no nombres de servicios o contenedores.
 3. **Evolución sin Ruptura:** Permite extraer módulos a microservicios independientes cambiando únicamente la regla de ruteo del Gateway, sin alterar una sola línea de código en el frontend.
+
+---
+
+### 1.1 Cuándo se usa el API Gateway y cuándo NO (Tráfico Norte-Sur vs. Este-Oeste)
+
+Para evitar convertir el Gateway en un cuello de botella o introducir saltos de red espurios, la arquitectura define con precisión qué flujos atraviesan el Gateway y cuáles se comunican directamente:
+
+| Caso de Uso | ¿Pasa por el Gateway? | Tipo de Tráfico | Destino / Protocolo | Justificación Técnica |
+| :--- | :---: | :--- | :--- | :--- |
+| **Frontend React → Catálogo / Socios** | **SÍ** | Norte-Sur | `http://localhost:9500/movies`<br/>`http://localhost:9500/api/socios` | Punto único de entrada, centralización de política CORS, fachada común de URLs y desacople de puertos. |
+| **Frontend React → Chat con Agente IA** | **SÍ** | Norte-Sur | `http://localhost:9500/api/agent/chat` | Evita llamadas cross-origin directas del browser al agente (:8085). El chat se expone como un recurso más de la plataforma. |
+| **Agente IA → Servidores MCP de Dominio** | **NO** | Este-Oeste | `http://catalog:8081/mcp`<br/>`http://membership:8082/mcp` | **Comunicación interna directa:** ambos residen en la misma red Docker (`videoclub_default`). Pasar por el Gateway agregaría latencia innecesaria en cada tool call del LLM y expondría endpoints de backoffice que no deben ser públicos. |
+| **Microservicio a Microservicio de Dominio** | **NO** | Este-Oeste | `amqp://rabbitmq:5672` | Desacoplamiento temporal y de resiliencia: la sincronización entre `catalog-service` y `membership-service` se realiza mediante mensajería asíncrona (RabbitMQ), sin llamadas HTTP sincrónicas. |
+| **Cualquier componente → Keycloak SSO** | **NO** | Identidad | `http://localhost:9090` (externo)<br/>`http://keycloak:9090` (interno) | **Separación de planos:** Keycloak opera en el plano de control de identidad. Los navegadores hacen OIDC directo; los microservicios resuelven JWKS directamente para evitar que el claim `iss` (Issuer) se corrompa por reescritura de URLs. |
+
+#### ¿Por qué la conexión Agente ↔ MCP es estrictamente interna?
+
+1. **Aislamiento Perimetral (Least Privilege):** Los endpoints `/mcp` (`catalog:8081/mcp` y `membership:8082/mcp`) exponen primitivas de control y ejecución de herramientas (`tools/call`, `resources/read`). No son APIs públicas para el usuario final ni deben ser alcanzables directamente desde el navegador a través del Gateway.
+2. **Latencia e Innecesarios Saltos de Red (Hop Penalty):** Durante una interacción conversacional, el orquestador del agente puede ejecutar múltiples herramientas encadenadas (ej. consultar socios y verificar disponibilidad de títulos). Cada tool invocation es una petición HTTP JSON-RPC síncrona; agregar un proxy intermedio añadiría sobrecarga de red y re-procesamiento de headers sin valor agregado.
+3. **Propagación de Seguridad Punto a Punto:** El agente ya implementa el patrón **Token Relay** ([sso-token-propagation.md](sso-token-propagation.md)): captura el JWT del usuario llamante (`Bearer <user_token>`) y lo inyecta directamente en la cabecera `Authorization` de la petición HTTP hacia `catalog:8081/mcp` o `membership:8082/mcp`. El microservicio receptor valida la firma contra Keycloak y ejecuta el `@PreAuthorize` sobre el método `@McpTool` exactamente igual que si viniera del Gateway.
 
 ---
 

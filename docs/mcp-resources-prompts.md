@@ -1,9 +1,11 @@
-# Incorporación de MCP Resources y MCP Prompts
+# Arquitectura de MCP Resources y MCP Prompts
 
-Hoy el ecosistema usa una sola de las tres primitivas de MCP: **Tools** (`@McpTool`). Este plan incorpora las otras dos —**Resources** (`@McpResource`) y **Prompts** (`@McpPrompt`)— sobre el dominio **que hoy existe**, y deja el patrón montado para los casos de uso con más negocio que vengan después.
+**Estado:** Implementado en `catalog-service`, `membership-service` y consumido por `videoclub-agent`.
+
+El ecosistema aprovecha las tres primitivas de Model Context Protocol (MCP): **Tools** (`@McpTool`), **Resources** (`@McpResource`) y **Prompts** (`@McpPrompt`) sobre los dominios de Catálogo y Socios, estableciendo los patrones arquitectónicos para futuras expansiones.
 
 > [!IMPORTANT]
-> **Este proyecto es una base didáctica.** El objetivo no es resolver el dominio del videoclub, sino dejar el patrón lo bastante claro como para que quien después modele préstamos, reservas o sanciones sepa exactamente dónde va cada cosa. Por eso todo lo que se expone acá sale de datos reales: un recurso que devuelve texto inventado no enseña el patrón, enseña a inventar.
+> **Este proyecto es una base didáctica.** El objetivo no es solo resolver el dominio del videoclub, sino dejar el patrón lo bastante claro como para que quien después modele préstamos, reservas o sanciones sepa exactamente dónde va cada cosa. Por eso todo lo que se expone acá sale de datos reales: un recurso que devuelve texto inventado no enseña el patrón, enseña a inventar.
 
 ---
 

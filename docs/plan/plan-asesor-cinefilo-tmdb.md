@@ -64,7 +64,7 @@ TMDB devuelve sus propios géneros; el catálogo acepta solo su enum `Genre`. La
 
 Forma propuesta: un recurso nuevo en `catalog-service`, del estilo `catalog://genres/tmdb-mapping`, que publique la correspondencia y deje explícito qué géneros de TMDB **no** tienen equivalente. Así el agente no decide nada: lee y aplica.
 
-Es el mismo movimiento que resolvió la duplicación del procedimiento de alta (sección 10.2 de [MCP-resoruce-prompt-plan.md](MCP-resoruce-prompt-plan.md)): el conocimiento del dominio se publica desde el servidor que lo posee, en un solo lugar, con un test que ancla que no se duplique.
+Es el mismo movimiento que resolvió la duplicación del procedimiento de alta (sección 10.2 de [mcp-resources-prompts.md](../mcp-resources-prompts.md)): el conocimiento del dominio se publica desde el servidor que lo posee, en un solo lugar, con un test que ancla que no se duplique.
 
 **Costo a aceptar:** `catalog-service` pasa a conocer la existencia de TMDB. Es conocimiento de integración dentro de un servicio de dominio. La alternativa —que el mapeo viva en `cinephile-service`— le haría conocer nuestro enum, que es peor: ahí sí se acopla a un detalle interno de otro servicio.
 
@@ -88,7 +88,7 @@ Consecuencia de diseño: el cinéfilo tiene que devolver **campos identificables
 ### 5.2. El riesgo que la colaboración reintroduce
 
 > [!WARNING]
-> **El aislamiento del sub-agente no alcanza si el orquestador hace de correo.** Las sinopsis de TMDB son texto de terceros. Si el orquestador las copia dentro de una delegación al catálogo, ese texto llega igual a un modelo que tiene `create_movie` a mano. La precaución de la sección 10.4 de [MCP-resoruce-prompt-plan.md](MCP-resoruce-prompt-plan.md) aplica de lleno.
+> **El aislamiento del sub-agente no alcanza si el orquestador hace de correo.** Las sinopsis de TMDB son texto de terceros. Si el orquestador las copia dentro de una delegación al catálogo, ese texto llega igual a un modelo que tiene `create_movie` a mano. La precaución de la sección 10.4 de [mcp-resources-prompts.md](../mcp-resources-prompts.md) aplica de lleno.
 
 Tres contenciones, de la más débil a la más fuerte:
 
