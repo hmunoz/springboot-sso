@@ -27,14 +27,16 @@ La plataforma VideoClub está organizada en microservicios desacoplados y servic
 
 ### 🏛️ 1. Registros de Decisiones de Arquitectura (ADR)
 
-* **[ADR-001 a ADR-012 — Decisiones de Plataforma y Backend Core](adr.md)**:
+* **[ADR-001 a ADR-015 — Decisiones de Plataforma y Backend Core](adr.md)**:
   * *ADR-001 a ADR-005:* Mensajería AMQP, topología de exchanges, consistencia eventual y sincronización del dominio de Socios.
   * *ADR-006 a ADR-007:* API Gateway, enrutamiento desacoplado orientado a recursos y aislamiento del plano de identidad.
   * *ADR-008 a ADR-012:* Servidor Model Context Protocol (MCP), transporte Streamable HTTP, autorización `@PreAuthorize` en las propias tools y soporte dual para Claude Code y Antigravity IDE.
-* **[ADR-001 a ADR-007 — Decisiones del Agente IA (Microservicio Asistente)](https://github.com/munozhoracio/agente-videoclub-sso/blob/main/docs/adr.md)**:
-  * *ADR-001 a ADR-003:* Arquitectura de Spring AI, integración con OpenAI/modelos locales y cliente MCP dinámico.
-  * *ADR-004 a ADR-005:* Propagación segura de identidad (Token Relay / SSO) hacia el Resource Server.
-  * *ADR-006 a ADR-007:* Streaming de componentes visuales (Generative UI) y protocolo de eventos Server-Sent Events (SSE).
+  * *ADR-013 a ADR-014:* Separación en dos microservicios (Database per Service y comunicación este-oeste por bus).
+  * *ADR-015:* Sincronización entre verticales mediante Event-Carried State Transfer (ECST) y réplica de proyecciones locales (ej. actualización de precios de Catálogo hacia Carrito de Compras).
+* **[ADR-013 a ADR-024 — Decisiones del Agente IA (Microservicio Asistente)](adr-agente.md)**:
+  * *ADR-013 a ADR-015:* Agente como microservicio independiente, Token Relay sin fallback y bootstrap de descubrimiento MCP.
+  * *ADR-016 a ADR-018:* Supervisor jerárquico, fail-fast ante ausencia de tools y propagación de denegaciones de permisos.
+  * *ADR-019 a ADR-024:* Memoria conversacional, Generative UI híbrido, respuesta bloqueante/streaming y GraalVM Native Image.
 
 ---
 
@@ -75,6 +77,8 @@ Ninguno de los dos necesita estar registrado como client en Keycloak para **vali
 * **[Servidor Model Context Protocol (MCP) con Spring AI](mcp-server.md)**:
   Servidor MCP sobre Streamable HTTP (`POST /mcp`) en modo `STATELESS`, autorización granular basada en roles (`usuarioadmin` vs. `usuariocliente`) e integración con clientes de IA.
   *Tras el corte hay **dos** servidores MCP, uno por servicio, cada uno anunciando su propio recurso en `/.well-known/oauth-protected-resource`. El documento todavía describe el servidor único del monolito; el mecanismo es idéntico, cambian el puerto y el reparto de tools.*
+* **[MCP Resources y MCP Prompts](mcp-resources-prompts.md)**:
+  Implementación de las tres primitivas de MCP: Resources (`@McpResource`) para inyección de contexto de catálogo y socios sin tool-calling, Prompts (`@McpPrompt`) para flujos guiados y consumo especializado en sub-agentes.
 * **[Gestión y Sincronización de Socios](socios.md)**:
   Modelo de dominio JPA, baja lógica (Soft Delete), procesamiento asíncrono con *Event-Carried State Transfer*, consumidor idempotente y Dead Letter Queue (`socio.events.dlq`).
 * **[Integración Keycloak, RabbitMQ y Anti-Corruption Layer (ACL)](keycloak-rabbitmq-integration.md)**:
@@ -93,19 +97,21 @@ Ninguno de los dos necesita estar registrado como client en Keycloak para **vali
 
 ### 🤖 5. Inteligencia Artificial, Streaming y UI Generativa (`agente-videoclub-sso`)
 
-* **[Propagación de Tokens SSO (Token Relay)](https://github.com/munozhoracio/agente-videoclub-sso/blob/main/docs/sso-token-propagation.md)**:
+* **[Propagación de Tokens SSO (Token Relay)](sso-token-propagation.md)**:
   Arquitectura para reenviar el Bearer JWT del usuario autenticado desde el frontend hacia el Agente y de este hacia las tools MCP del backend, preservando la identidad del usuario final en llamadas intermediadas por IA.
-* **[Integración Gateway, Token Relay y Chat React](https://github.com/munozhoracio/agente-videoclub-sso/blob/main/docs/gateway-agent-integration.md)**:
+* **[Integración Gateway, Token Relay y Chat React](gateway-agent-integration.md)**:
   Ruta `/api/agent/**` en el Gateway, enrutamiento Netty hacia el microservicio en `:8085` y consumo desde el frontend.
-* **[Patrón Generative UI con SSE Streaming](https://github.com/munozhoracio/agente-videoclub-sso/blob/main/docs/generative-ui-pattern.md)**:
+* **[Patrón Generative UI con SSE Streaming](generative-ui-pattern.md)**:
   Emisión de tokens en tiempo real combinada con payload estructurado para que el frontend en React renderice componentes interactivos (fichas de películas, formularios) a medida que el LLM genera respuestas.
-* **[Plan de Streaming AG-UI](https://github.com/munozhoracio/agente-videoclub-sso/blob/main/docs/agui-streaming-plan.md)**:
+* **[Plan de Streaming AG-UI](plan/agui-streaming-plan.md)**:
   Hoja de ruta y diseño técnico del protocolo de streaming de eventos para asistentes conversacionales.
+* **[Plan: Asesor Cinéfilo con un servidor MCP propio sobre TMDB](plan/plan-asesor-cinefilo-tmdb.md)**:
+  Plan sin implementar. Conocimiento de cine de mundo abierto como proyecto MCP nuevo (`cinephile-service`), sub-agente de solo lectura, colaboración entre sub-agentes para el alta asistida de películas, y por qué se descartó el servidor MCP de IMDb.
 
 > [!NOTE]
 > **El agente pasó de un cliente MCP a dos.** `McpClientConfiguration` publica ahora cinco beans: un `McpSyncClient` por backend, un `SyncMcpToolCallbackProvider` con `@Qualifier` para cada uno —de modo que `CatalogSubAgent` no pueda ni ver las tools de socios— y un tercero `@Primary` que agrega ambos, que es el que responde `GET /api/agent/tools` con las 6 tools.
 >
-> Cada cliente tiene su **propia** ventana de descubrimiento (`AtomicBoolean` local). Compartir una sola haría que el `initialize()` del segundo cliente encontrara la ventana ya cerrada por el `finally` del primero, y el handshake de arranque fallaría. Los sub-agentes **no tienen una lista de nombres de tools**: cada uno usa todas las tools de su provider dedicado, y el límite del dominio queda en `McpClientConfiguration`. El fail-fast se mantiene si el provider no expone ninguna. Ver la decisión en la sección 10.5 de [MCP-resoruce-prompt-plan.md](MCP-resoruce-prompt-plan.md#105-decisión-los-sub-agentes-ya-no-tienen-una-lista-de-tools-escrita-a-mano).
+> Cada cliente tiene su **propia** ventana de descubrimiento (`AtomicBoolean` local). Compartir una sola haría que el `initialize()` del segundo cliente encontrara la ventana ya cerrada por el `finally` del primero, y el handshake de arranque fallaría. Los sub-agentes **no tienen una lista de nombres de tools**: cada uno usa todas las tools de su provider dedicado, y el límite del dominio queda en `McpClientConfiguration`. El fail-fast se mantiene si el provider no expone ninguna. Ver la decisión en la sección 10.5 de [mcp-resources-prompts.md](mcp-resources-prompts.md#105-decisión-los-sub-agentes-ya-no-tienen-una-lista-de-tools-escrita-a-mano).
 
 ---
 
@@ -113,6 +119,22 @@ Ninguno de los dos necesita estar registrado como client en Keycloak para **vali
 
 * **[Documentación del Frontend en React 19](https://github.com/hmunoz/react-sso#readme)**:
   Implementación de `react-oidc-context` con PKCE, hook `usePermissions()`, protección de rutas con `PermissionGuard`, caché asíncrona con TanStack Query y componentes interactivos para el catálogo, usuarios y chat con el agente.
+
+---
+
+### 📋 7. Planes de Evolución y Arquitectura (`docs/plan/`)
+
+Espacio centralizado donde residen los planes de diseño técnico y propuestas evolutivas para todos los componentes de la plataforma (independientemente del repositorio de destino):
+
+* **[Plan: Asesor Cinéfilo con Servidor MCP sobre TMDB](plan/plan-asesor-cinefilo-tmdb.md)**:
+  * **Problema:** Expande el conocimiento de cine del asistente desde un inventario cerrado a mundo abierto, permitiendo asesoramiento libre y alta asistida de películas en el catálogo del videoclub.
+  * **Arquitectura:** Nuevo microservicio y servidor MCP (`cinephile-service`), sub-agente de solo lectura y colaboración inter-agentes (`CinephileSubAgent` + `CatalogSubAgent`).
+* **[Plan: Human-in-the-Loop (HITL), Escalado a Operador y Guardrails](plan/plan-human-in-the-loop.md)**:
+  * **Problema:** Permite la intervención humana ante consultas fuera de competencia del agente o para supervisar acciones críticas y destructivas de sub-agentes (bajas de socios, modificaciones sensibles).
+  * **Arquitectura:** Dos patrones evaluados: (1) *Live Operator Hand-off* con RabbitMQ y SSE, y (2) *Action Approval Guardrails* con UI Generativa. Gobierno estricto mediante PBAC con el permiso `agent-permission-hitl` (sin `hasRole`), asignable al grupo `administrador`.
+* **[Plan: Integración de Streaming AG-UI](plan/agui-streaming-plan.md)**:
+  * **Problema:** Evaluación de protocolos y SDKs para streaming de eventos de agente (AG-UI vs SSE puro), y resolución del desacople de identidad en hilos reactivos antes de migrar a streaming completo.
+  * **Arquitectura:** Análisis de coordenadas de dependencias, contención de seguridad sobre `ThreadLocal` / `SecurityContextHolder` y secuenciación en dos rutas de migración.
 
 ---
 
@@ -136,10 +158,12 @@ Las dos bases las crea `docker/postgresql/init.sql`, montado en `/docker-entrypo
 
 > [!CAUTION]
 > PostgreSQL ejecuta ese script **solo cuando el directorio de datos está vacío**. Sobre un volumen que ya existe lo ignora sin ningún aviso. Para forzarlo:
+>
 > ```bash
 > docker compose -f docker/services.yaml down -v   # destruye los datos existentes
 > docker compose -f docker/services.yaml up -d
 > ```
+>
 > Cada servicio crea su propio esquema al arrancar (`spring.jpa.hibernate.ddl-auto=update`), pero **no hay datos semilla**: tras un `down -v` el catálogo queda vacío.
 
 ---
@@ -180,8 +204,16 @@ Todos los documentos de este hub están **alineados con la arquitectura de dos s
 | [adr.md](adr.md) | ADR-001 a ADR-014. Los dos últimos registran la estrategia de microservicios. |
 | [arquitectura-dos-servicios.md](arquitectura-dos-servicios.md) | Decisiones D1–D7 y trampas C1–C10. |
 | [mcp-server.md](mcp-server.md) | Dos servidores MCP, uno por servicio. |
+| [mcp-resources-prompts.md](mcp-resources-prompts.md) | Primitivas MCP (Tools, Resources, Prompts) en catálogo, membresía y agente. |
 | [socios.md](socios.md) | `membership-service`, base `video_membership`. |
 | [CORS.md](CORS.md) | Capas y diagnóstico sobre `:8081` / `:8082`. |
 | [seguridad-oauth2-openid-connect-keycloak.md](seguridad-oauth2-openid-connect-keycloak.md) | Swagger por servicio y el caso del `redirect_uri`. |
 | [api-gateway.md](api-gateway.md) | Tabla de ruteo a `catalog` y `membership`. |
 | [keycloak-rabbitmq-integration.md](keycloak-rabbitmq-integration.md) | Topología AMQP con diagramas. |
+| [adr-agente.md](adr-agente.md) | ADR-013 a ADR-024. Decisiones de arquitectura del Agente IA. |
+| [gateway-agent-integration.md](gateway-agent-integration.md) | Integración Gateway, Token Relay y chat en React. |
+| [sso-token-propagation.md](sso-token-propagation.md) | Propagación de identidad y JWT (Token Relay) hacia MCP. |
+| [generative-ui-pattern.md](generative-ui-pattern.md) | Patrón de UI Generativa híbrida con componentes React. |
+| [plan/plan-asesor-cinefilo-tmdb.md](plan/plan-asesor-cinefilo-tmdb.md) | Plan: Servidor MCP sobre TMDB y sub-agente cinéfilo. |
+| [plan/plan-human-in-the-loop.md](plan/plan-human-in-the-loop.md) | Plan: Soporte HITL, hand-off vía RabbitMQ y guardrails PBAC. |
+| [plan/agui-streaming-plan.md](plan/agui-streaming-plan.md) | Plan: Evaluación de streaming AG-UI y propagación reactiva. |

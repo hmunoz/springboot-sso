@@ -1,7 +1,0 @@
-name: videoclub
-services:
-  mcp-imdb:
-    image: ghcr.io/juanmandev/mcp-imdb:pr-4
-    ports:
-      - "8000:8000"
-    restart: always
