@@ -7,6 +7,14 @@
         "clientId": "videoclub-mcp",
         "callbackPort": 8090
       }
-    }
+    },
+      "opengym": {
+        "type": "http",
+        "url": "https://ikxota5xsj.execute-api.us-east-1.amazonaws.com/mcp",
+        "oauth": {
+          "clientId": "787jthd7k8qo9q0i9cgq7p2e29",
+          "callbackPort": 8090
+        }
+      }
   }
 }
