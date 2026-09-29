@@ -6,6 +6,7 @@ import ar.unrn.video.membership.client.keycloak.dto.KeycloakTokenResponseDTO;
 import ar.unrn.video.membership.client.keycloak.dto.KeycloakUserCreateDTO;
 import ar.unrn.video.membership.client.keycloak.dto.KeycloakUserDTO;
 import ar.unrn.video.membership.event.Event;
+import ar.unrn.video.membership.event.MoviePayload;
 import ar.unrn.video.membership.event.SocioPayload;
 import ar.unrn.video.membership.model.KeycloakEvent;
 import ar.unrn.video.membership.model.SocioDTO;
@@ -52,6 +53,7 @@ public class NativeRuntimeHints implements RuntimeHintsRegistrar {
                 KeycloakEvent.AuthDetails.class,
                 SocioPayload.class,
                 Event.class,
-                SocioDTO.class);
+                SocioDTO.class,
+                MoviePayload.class);
     }
 }

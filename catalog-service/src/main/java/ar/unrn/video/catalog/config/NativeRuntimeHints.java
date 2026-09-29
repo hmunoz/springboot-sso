@@ -1,5 +1,6 @@
 package ar.unrn.video.catalog.config;
 
+import ar.unrn.video.catalog.event.MoviePayload;
 import ar.unrn.video.catalog.model.MovieDTO;
 import ar.unrn.video.catalog.model.MovieTitleUnique;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,8 +22,8 @@ public class NativeRuntimeHints implements RuntimeHintsRegistrar {
 
     @Override
     public void registerHints(final RuntimeHints hints, final ClassLoader classLoader) {
-        // 1. Reflection for DTO records bound by Jackson / REST / MCP
-        bindingRegistrar.registerReflectionHints(hints.reflection(), MovieDTO.class);
+        // 1. Reflection for DTO records bound by Jackson / REST / MCP / AMQP
+        bindingRegistrar.registerReflectionHints(hints.reflection(), MovieDTO.class, MoviePayload.class);
 
         // 2. Constructor of the custom Bean Validation validator.
         //

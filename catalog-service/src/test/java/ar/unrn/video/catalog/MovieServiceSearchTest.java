@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Sort;
 
 import java.util.List;
@@ -28,7 +29,7 @@ class MovieServiceSearchTest {
     @BeforeEach
     void setUp() {
         movieRepository = mock(MovieRepository.class);
-        movieService = new MovieService(movieRepository);
+        movieService = new MovieService(movieRepository, mock(ApplicationEventPublisher.class));
     }
 
     private Movie movie(Long id, String title) {

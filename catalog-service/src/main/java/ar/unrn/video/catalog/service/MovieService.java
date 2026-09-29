@@ -1,21 +1,27 @@
 package ar.unrn.video.catalog.service;
 
 import ar.unrn.video.catalog.domain.Movie;
+import ar.unrn.video.catalog.event.MovieDomainEvent;
 import ar.unrn.video.catalog.model.MovieDTO;
 import ar.unrn.video.catalog.repos.MovieRepository;
 import ar.unrn.video.catalog.util.NotFoundException;
 import java.util.List;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 
 @Service
 public class MovieService {
 
     private final MovieRepository movieRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
-    public MovieService(final MovieRepository movieRepository) {
+    public MovieService(final MovieRepository movieRepository,
+            final ApplicationEventPublisher applicationEventPublisher) {
         this.movieRepository = movieRepository;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     public List<MovieDTO> findAll() {
@@ -38,17 +44,27 @@ public class MovieService {
                 .orElseThrow(NotFoundException::new);
     }
 
+    @Transactional
     public Long create(final MovieDTO movieDTO) {
         final Movie movie = new Movie();
         mapToEntity(movieDTO, movie);
-        return movieRepository.save(movie).getId();
+        final Movie saved = movieRepository.save(movie);
+
+        applicationEventPublisher.publishEvent(
+                new MovieDomainEvent(saved.getId(), saved.getTitle(), saved.getPrice(), MovieDomainEvent.CREATED));
+
+        return saved.getId();
     }
 
+    @Transactional
     public void update(final Long id, final MovieDTO movieDTO) {
         final Movie movie = movieRepository.findById(id)
                 .orElseThrow(NotFoundException::new);
         mapToEntity(movieDTO, movie);
-        movieRepository.save(movie);
+        final Movie saved = movieRepository.save(movie);
+
+        applicationEventPublisher.publishEvent(
+                new MovieDomainEvent(saved.getId(), saved.getTitle(), saved.getPrice(), MovieDomainEvent.UPDATED));
     }
 
     public void delete(final Long id) {
