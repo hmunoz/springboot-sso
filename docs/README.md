@@ -235,3 +235,4 @@ Todos los documentos de este hub están **alineados con la arquitectura de dos s
 | [plan/plan-asesor-cinefilo-tmdb.md](plan/plan-asesor-cinefilo-tmdb.md) | Plan: Servidor MCP sobre TMDB y sub-agente cinéfilo. |
 | [plan/plan-human-in-the-loop.md](plan/plan-human-in-the-loop.md) | Plan: Soporte HITL, hand-off vía RabbitMQ y guardrails PBAC. |
 | [plan/agui-streaming-plan.md](plan/agui-streaming-plan.md) | Plan: Evaluación de streaming AG-UI y propagación reactiva. |
+| [observabilidad.md](observabilidad.md) | Stack de telemetría: Prometheus, Grafana, Loki, Tempo y RabbitMQ. |

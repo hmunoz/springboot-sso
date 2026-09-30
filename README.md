@@ -11,6 +11,7 @@ Dos microservicios Spring Boot 4 (Java 25) como **OAuth 2.0 Resource Servers**, 
 
 > 🧭 **Documentación de Arquitectura Global:** Para la visión integral de la plataforma, topología de servicios, catálogo de ADRs y contratos, consultá [`docs/README.md`](docs/README.md).
 > 📘 **Guía didáctica completa de seguridad**: teoría, flujos, diagramas Mermaid y laboratorio paso a paso en [`docs/seguridad-oauth2-openid-connect-keycloak.md`](docs/seguridad-oauth2-openid-connect-keycloak.md).
+> 📊 **Guía de Observabilidad**: stack de Prometheus, Grafana, Loki, Tempo y RabbitMQ en [`docs/observabilidad.md`](docs/observabilidad.md).
 
 ## Repositorios de la Plataforma
 
@@ -99,6 +100,7 @@ VITE_API_BASE_URL=http://localhost:9500   # el gateway, que rutea a los dos serv
 | RabbitMQ | http://localhost:15672 | Consola del broker |
 | MailHog | http://localhost:8025 | Bandeja de correo de desarrollo |
 | PostgreSQL | localhost:5432 | Dos bases: `video_catalog` y `video_membership` |
+| Grafana (Observabilidad) | http://localhost:3002 | Dashboards de métricas, RabbitMQ, logs (Loki) y trazas (Tempo) |
 
 > **El puerto de Keycloak sale de `docker/.env` (`KEYCLOAK_PORT=9090`).** Todos los valores por defecto están alineados a 9090 (`KC_HOSTNAME` y `ports` en `docker/keycloak.yaml`, `issuer-uri` y `jwk-set-uri` en el `application.yml` de cada servicio), así que si el archivo de entorno no se carga el stack sigue siendo coherente. Si cambiás el puerto, cambialo en los dos lugares: un `KC_HOSTNAME` que no coincida con el puerto publicado deja a Keycloak anunciándose donde no escucha, y todo falla con `401` / *issuer mismatch*.
 
