@@ -10,6 +10,7 @@ Esta guía documenta la arquitectura, diseño y operación del stack de observab
 2. **Aislamiento Estricto de Puertos**: Solo se expone hacia el host el puerto de visualización de **Grafana** (`3002:3000` vía `${GRAFANA_PORT:-3002}`). Todo el tráfico interno de telemetría —scraping de Prometheus (`:9090`), ingestión de Loki (`:3100`), recolección OTLP de Tempo (`:4317`/`:4318`) y métricas de RabbitMQ (`:15692`)— fluye de forma privada y encriptada por la red interna `videoclub_default`.
 3. **Acceso Anónimo (Admin)**: Grafana está preconfigurado con login anónimo en rol `Admin` (`GF_AUTH_ANONYMOUS_ENABLED=true`), eliminando la fricción de autenticación en entornos locales y de laboratorio.
 4. **Provisioning Declarativo as Code**: Datasources y dashboards se aprovisionan automáticamente desde el sistema de archivos (`docker/observability/grafana/`). No se requiere configuración manual en la UI de Grafana.
+5. **Bajo Consumo de Recursos**: Todo el stack de observabilidad consume apenas **~330 MB de RAM** en reposo. Para el desglose completo del sistema (base + observabilidad + comparativa GraalVM vs. JVM), consultá el [Perfil de Recursos y Dimensionamiento en docs/README.md](README.md#-perfil-de-recursos-y-dimensionamiento-ram-y-cpu).
 
 ---
 

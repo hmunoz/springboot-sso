@@ -212,6 +212,59 @@ Los hostnames son las **claves de servicio** de los compose, que es lo que resue
 
 ---
 
+## 💻 Perfil de Recursos y Dimensionamiento (RAM y CPU)
+
+El consumo de recursos de la plataforma varía sustancialmente según el modo de ejecución de los microservicios (**Imágenes Nativas GraalVM** vs. **JVM estándar**).
+
+### 1. Consumo Real Medido en Reposo (Stack Completo)
+
+#### Servicios de Negocio e Infraestructura Base
+
+| Contenedor | Runtime | RAM en Reposo | CPU en Reposo |
+| :--- | :--- | :--- | :--- |
+| **`video-keycloak`** | JVM (Quarkus) | **~694 MB** | ~0.1% |
+| **`videoclub-catalog-prod`** | GraalVM Nativo | **~142 MB** | ~0.01% |
+| **`videoclub-membership-prod`** | GraalVM Nativo | **~138 MB** | ~0.04% |
+| **`videoclub-gateway-1`** | GraalVM Nativo | **~123 MB** | ~0.03% |
+| **`videoclub-agent-prod`** | GraalVM Nativo | **~121 MB** | ~0.02% |
+| **`videoclub-rabbit-1`** | Erlang / OTP | **~72 MB** | ~0.1% |
+| **`video-postgresql`** | C / Alpine | **~57 MB** | ~0.01% |
+| **`videoclub-frontend-app-prod`** | Nginx | **~8 MB** | 0% |
+| **`mailhog`** | Go | **~3 MB** | 0% |
+| **Subtotal Base** | | **~1.35 GB** | **< 0.4%** |
+
+#### Stack de Observabilidad (`docker/observability.yaml`)
+
+| Contenedor | Rol | RAM en Reposo | CPU en Reposo |
+| :--- | :--- | :--- | :--- |
+| **`videoclub-prometheus`** | Scraping cada 15s | **~90 MB** | ~0.02% |
+| **`videoclub-loki`** | Ingestión de logs | **~83 MB** | ~0.25% |
+| **`videoclub-grafana`** | UI y Dashboards | **~61 MB** | ~0.02% |
+| **`videoclub-promtail`** | Agente colector Docker | **~49 MB** | ~0.15% |
+| **`videoclub-tempo`** | Almacén de trazas | **~47 MB** | ~0.02% |
+| **Subtotal Observabilidad** | | **~330 MB** | **< 0.5%** |
+
+> **Consumo Total Runtime Actual:** **~1.7 GB de RAM** y **< 1% de CPU** en reposo.
+
+---
+
+### 2. Comparativa Arquitectónica: GraalVM Nativo vs. JVM (Dev)
+
+* **GraalVM Native Image (`-native`)**: Cada microservicio Spring Boot consume entre **120 y 145 MB** de memoria gracias al análisis Ahead-of-Time (AOT), eliminación de código muerto y ausencia de compilador JIT en memoria.
+* **Modo JVM Estándar (`mvn spring-boot:run` o JRE Alpine)**: Cada proceso Spring Boot reserva entre **350 y 500 MB** de memoria (Heap + Metaspace). Los 4 servicios combinados demandan ~1.8 GB (frente a los ~524 MB nativos), elevando el consumo total del stack a **~3.2 a 3.5 GB de RAM**.
+
+---
+
+### 3. Requerimientos Recomendados (Sizing)
+
+| Escenario | RAM Asignada | CPU Recomendada | Notas |
+| :--- | :--- | :--- | :--- |
+| **Runtime Nativo + Observabilidad** | **4 GB** (Docker) | **2 Cores** | Ejecución de contenedores precompilados; holgado para picos de tráfico y Keycloak. |
+| **Desarrollo Completo (JVM + IDE)** | **8 GB** (Host) | **4 Cores** | 4 GB para Docker (servicios en hot-reload) + 4 GB para IDE y navegador. |
+| **Compilación Nativa (`native:compile`)** | **8 GB libres** | **4+ Cores** | El análisis estático de GraalVM es intensivo en CPU y RAM; con menos de 6-8 GB el build puede fallar por Out Of Memory (OOM). |
+
+---
+
 ## 📌 Estado de esta documentación
 
 Todos los documentos de este hub están **alineados con la arquitectura de dos servicios**. Los `:8080` que quedan en [CORS.md](CORS.md) §5.3 y §5.4 son deliberados: son post-mortems de configuraciones pasadas y cambiarles el puerto falsificaría lo que ocurrió.
