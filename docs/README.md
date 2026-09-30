@@ -166,6 +166,24 @@ Las dos bases las crea `docker/postgresql/init.sql`, montado en `/docker-entrypo
 >
 > Cada servicio crea su propio esquema al arrancar (`spring.jpa.hibernate.ddl-auto=update`), pero **no hay datos semilla**: tras un `down -v` el catálogo queda vacío.
 
+### Observabilidad (Opt-in)
+
+El stack de telemetría es **completamente opcional y desacoplado** en `docker/observability.yaml` para asegurar cero impacto en recursos si no se utiliza:
+
+```bash
+docker compose -f docker/observability.yaml up -d
+```
+
+| Servicio | Contenedor | Puerto Local | Descripción |
+| :--- | :--- | :--- | :--- |
+| **Grafana** | `videoclub-grafana` | `3002` | Dashboard unificado (login anónimo Admin). |
+| **Prometheus** | `videoclub-prometheus` | *Interno* (`:9090`) | Scrape de Spring Boot (`catalog`, `membership`, `gateway`) y RabbitMQ. |
+| **Loki** | `videoclub-loki` | *Interno* (`:3100`) | Ingestión y consulta de logs estructurados. |
+| **Promtail** | `videoclub-promtail` | *Interno* | Agente colector de logs leyendo desde `/var/run/docker.sock`. |
+| **Tempo** | `videoclub-tempo` | *Interno* (`:4318`) | Recolector OTLP de trazas distribuidas. |
+
+Guía completa de arquitectura, dashboards y métricas de RabbitMQ en **[Observabilidad (Métricas, Logs y Trazas)](observabilidad.md)**.
+
 ---
 
 ## 🚀 Servicios de Aplicación
