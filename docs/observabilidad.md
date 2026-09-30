@@ -179,7 +179,7 @@ Los dashboards se encuentran en `docker/observability/grafana/dashboards/`:
 | Dashboard | UID | Enlace Directo | Descripción |
 | :--- | :--- | :--- | :--- |
 | **RabbitMQ Overview** | `rabbitmq-overview` | [Ver Dashboard](http://localhost:3002/d/rabbitmq-overview/rabbitmq-overview) | Monitoreo integral de colas, exchanges, tasas de entrega, consumidores y memoria Erlang. |
-| **Spring Boot & JVM** | `spring-boot-overview` | [Ver Dashboard](http://localhost:3002/d/spring-boot-overview/spring-boot-and-jvm-overview) | Métricas de CPU, Heap JVM, Garbage Collection, hilos de Tomcat y peticiones HTTP. |
+| **Spring Boot & JVM** | `spring-boot-overview` | [Ver Dashboard](http://localhost:3002/d/spring-boot-overview/spring-boot-and-jvm-overview) | Métricas de CPU, Heap JVM, peticiones HTTP y **saturación del pool de conexiones a PostgreSQL (HikariCP)**. |
 | **Centralized Logs** | `loki-logs-overview` | [Ver Dashboard](http://localhost:3002/d/loki-logs-overview/centralized-logs-loki) | Streaming de logs en vivo de todos los contenedores con filtros por servicio y búsqueda de texto. |
 | **Distributed Tracing** | `tempo-tracing-overview` | [Ver Dashboard](http://localhost:3002/d/tempo-tracing-overview/distributed-tracing-tempo) | Búsqueda de trazas distribuidas y análisis de latencia extremo a extremo. |
 
