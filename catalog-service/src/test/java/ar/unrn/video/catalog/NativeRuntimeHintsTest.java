@@ -1,6 +1,7 @@
 package ar.unrn.video.catalog;
 
 import ar.unrn.video.catalog.config.NativeRuntimeHints;
+import ar.unrn.video.catalog.event.MoviePayload;
 import ar.unrn.video.catalog.model.MovieDTO;
 import ar.unrn.video.catalog.model.MovieTitleUnique;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,6 +33,18 @@ class NativeRuntimeHintsTest {
     void movieDtoIsRegistered() {
         assertTrue(RuntimeHintsPredicates.reflection().onType(MovieDTO.class).test(hints),
                 "MovieDTO is serialized by Jackson over REST and MCP; without the hint it binds to nothing");
+    }
+
+    @Test
+    @DisplayName("the movie event payload can be bound reflectively")
+    void moviePayloadIsRegistered() {
+        // MovieEventPublisher serializes MoviePayload with the Jackson AMQP converter after
+        // commit. On the JVM Jackson reads the record components through plain reflection and
+        // nothing here would ever fail; on a native image getRecordComponents() throws unless
+        // this hint registers it, and the failure only surfaces the first time a movie is
+        // created or updated.
+        assertTrue(RuntimeHintsPredicates.reflection().onType(MoviePayload.class).test(hints),
+                "MoviePayload is serialized by Jackson over AMQP; without the hint it binds to nothing");
     }
 
     @Test

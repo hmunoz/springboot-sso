@@ -1,0 +1,34 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'catalog-service'
+    metrics_path: '/metrics/prometheus'
+    static_configs:
+      - targets: ['catalog:8081']
+
+  - job_name: 'membership-service'
+    metrics_path: '/metrics/prometheus'
+    static_configs:
+      - targets: ['membership:8082']
+
+  - job_name: 'gateway'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['gateway:9500']
+
+  - job_name: 'rabbitmq'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['rabbit:15692']
+
+  - job_name: 'rabbitmq-per-object'
+    metrics_path: '/metrics/per-object'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['rabbit:15692']

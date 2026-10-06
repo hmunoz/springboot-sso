@@ -116,6 +116,7 @@ videoclub:
   rabbitmq:
     exchange: ${VIDEOCLUB_EXCHANGE:videoclub.events}
     socio-queue: ${VIDEOCLUB_SOCIO_QUEUE:socio.events.queue}
+    movie-queue: ${VIDEOCLUB_MOVIE_QUEUE:membership.movie-events.queue}
 
 # Este es el unico servicio que llama a la Admin REST API de Keycloak (KeycloakAdminClient,
 # client credentials del client confidencial `videoclub-backend`). Ver decision D5.
@@ -158,3 +159,9 @@ management:
       enabled: true
     prometheus:
       enabled: true
+  tracing:
+    sampling:
+      probability: ${TRACING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${MANAGEMENT_OTLP_TRACING_ENDPOINT:http://tempo:4318/v1/traces}

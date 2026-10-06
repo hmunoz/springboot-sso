@@ -37,9 +37,14 @@ public class RabbitMQConfig {
     @Value("${videoclub.rabbitmq.socio-queue:socio.events.queue}")
     private String socioQueueName;
 
+    @Value("${videoclub.rabbitmq.movie-queue:membership.movie-events.queue}")
+    private String movieQueueName;
+
     private static final String VIDEOCLUB_DLX = "videoclub.events.dlx";
     private static final String SOCIO_DLQ = "socio.events.dlq";
     private static final String SOCIO_DLQ_ROUTING_KEY = "socio.dlq";
+    private static final String MOVIE_DLQ = "membership.movie.dlq";
+    private static final String MOVIE_DLQ_ROUTING_KEY = "membership.movie.dlq";
 
     @Bean
     public TopicExchange keycloakExchange() {
@@ -108,6 +113,39 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(socioDeadLetterQueue)
                 .to(videoclubDeadLetterExchange)
                 .with(SOCIO_DLQ_ROUTING_KEY);
+    }
+
+    // ------------------------------------------------------------------
+    // Movie projection. Bound with a wildcard because the projection is a
+    // passive mirror: movie.created and movie.updated resolve to the same
+    // upsert (see MovieProjectionService), so one queue covers both.
+    // ------------------------------------------------------------------
+
+    @Bean
+    public Queue movieQueue() {
+        return QueueBuilder.durable(movieQueueName)
+                .deadLetterExchange(VIDEOCLUB_DLX)
+                .deadLetterRoutingKey(MOVIE_DLQ_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
+    public Binding movieEventsBinding(Queue movieQueue, TopicExchange videoclubEventsExchange) {
+        return BindingBuilder.bind(movieQueue)
+                .to(videoclubEventsExchange)
+                .with("movie.#");
+    }
+
+    @Bean
+    public Queue movieDeadLetterQueue() {
+        return QueueBuilder.durable(MOVIE_DLQ).build();
+    }
+
+    @Bean
+    public Binding movieDeadLetterBinding(Queue movieDeadLetterQueue, TopicExchange videoclubDeadLetterExchange) {
+        return BindingBuilder.bind(movieDeadLetterQueue)
+                .to(videoclubDeadLetterExchange)
+                .with(MOVIE_DLQ_ROUTING_KEY);
     }
 
     // ------------------------------------------------------------------
