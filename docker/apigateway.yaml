@@ -2,6 +2,8 @@ name: videoclub
 services:
   gateway:
     image: videoclub-gateway:1.0.0-native
+    container_name: videoclub-gateway
+    restart: always
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

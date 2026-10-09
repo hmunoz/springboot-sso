@@ -22,6 +22,8 @@ services:
     container_name: videoclub-catalog-prod
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    ports:
+      - "${CATALOG_SERVER_PORT:-8081}:8081"
     environment:
       SERVER_PORT: ${CATALOG_SERVER_PORT:-8081}
       SPRING_DOCKER_COMPOSE_ENABLED: "false"
@@ -52,6 +54,8 @@ services:
     container_name: videoclub-membership-prod
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    ports:
+      - "${MEMBERSHIP_SERVER_PORT:-8082}:8082"
     environment:
       SERVER_PORT: ${MEMBERSHIP_SERVER_PORT:-8082}
       SPRING_DOCKER_COMPOSE_ENABLED: "false"

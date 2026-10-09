@@ -1190,11 +1190,18 @@
         "http://localhost:6274/*",
         "http://127.0.0.1:6274/*",
         "http://localhost:8090/*",
-        "http://127.0.0.1:8090/*"
+        "http://127.0.0.1:8090/*",
+        "https://claude.ai/api/mcp/auth_callback",
+        "https://claude.ai/*",
+        "https://chatgpt.com/connector_platform_oauth_redirect",
+        "https://chatgpt.com/*"
       ],
       "webOrigins": [
         "http://localhost:6274",
-        "http://127.0.0.1:6274"
+        "http://127.0.0.1:6274",
+        "https://claude.ai",
+        "https://chatgpt.com",
+        "+"
       ],
       "notBefore": 0,
       "bearerOnly": false,
@@ -1224,7 +1231,7 @@
         "access.token.lifespan": "1800"
       },
       "authenticationFlowBindingOverrides": {},
-      "fullScopeAllowed": false,
+      "fullScopeAllowed": true,
       "nodeReRegistrationTimeout": -1,
       "protocolMappers": [
         {
@@ -1255,11 +1262,69 @@
         "address",
         "phone",
         "offline_access",
-        "microprofile-jwt"
+        "microprofile-jwt",
+        "service_account"
       ]
     }
   ],
   "clientScopes": [
+    {
+      "id": "b6cccbe6-795b-4ff2-a657-dede00c2587e",
+      "name": "service_account",
+      "description": "Specific scope for a client enabled for service accounts",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "id": "58ef81a0-3383-4829-9666-9ee6688e7541",
+          "name": "Client ID",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.session.note": "client_id",
+            "id.token.claim": "true",
+            "introspection.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "client_id",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "id": "43d4ec76-bced-4e4d-85e6-e0cad245d0a9",
+          "name": "Client IP Address",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.session.note": "clientAddress",
+            "id.token.claim": "true",
+            "introspection.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "clientAddress",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "id": "d36bc730-a30a-4422-8b08-ee7e913f5a2b",
+          "name": "Client Host",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.session.note": "clientHost",
+            "id.token.claim": "true",
+            "introspection.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "clientHost",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    },
     {
       "id": "4ca4de51-b3b5-409b-aaf8-0b485b46f8a3",
       "name": "role_list",
@@ -1335,7 +1400,7 @@
       "description": "OpenID Connect scope for add user roles to the access token",
       "protocol": "openid-connect",
       "attributes": {
-        "include.in.token.scope": "false",
+        "include.in.token.scope": "true",
         "consent.screen.text": "${rolesScopeConsentText}",
         "display.on.consent.screen": "true"
       },
@@ -1389,7 +1454,7 @@
       "description": "OpenID Connect scope for add allowed web origins to the access token",
       "protocol": "openid-connect",
       "attributes": {
-        "include.in.token.scope": "false",
+        "include.in.token.scope": "true",
         "consent.screen.text": "",
         "display.on.consent.screen": "false"
       },
@@ -1530,7 +1595,7 @@
       "description": "OpenID Connect scope for add acr (authentication context class reference) to the token",
       "protocol": "openid-connect",
       "attributes": {
-        "include.in.token.scope": "false",
+        "include.in.token.scope": "true",
         "display.on.consent.screen": "false"
       },
       "protocolMappers": [
@@ -1862,7 +1927,7 @@
       "description": "OpenID Connect scope for add all basic claims to the token",
       "protocol": "openid-connect",
       "attributes": {
-        "include.in.token.scope": "false",
+        "include.in.token.scope": "true",
         "display.on.consent.screen": "false"
       },
       "protocolMappers": [

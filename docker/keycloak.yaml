@@ -11,7 +11,9 @@ services:
       KC_FEATURES: scripts
       KC_HEALTH_ENABLED: true
       KC_HTTP_MANAGEMENT_PORT: 9990
-      KC_HOSTNAME: "http://localhost:${KEYCLOAK_PORT:-9090}"
+      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME}
+      KC_PROXY_HEADERS: xforwarded
+      KEYCLOAK_PORT: ${KEYCLOAK_PORT}
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "false"
       # RabbitMQ — consumed by the custom SPI
       RABBITMQ_HOST: rabbit

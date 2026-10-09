@@ -61,3 +61,64 @@ spring:
                 - Path=/api/agent/**
               filters:
                 - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
+
+            # =================================================================
+            # MCP & RFC 9728 Discovery Routes
+            # =================================================================
+            # RFC 9728 Discovery - Catalog
+            - id: service-catalog-mcp-discovery
+              uri: http://catalog:8081
+              predicates:
+                - Path=/.well-known/oauth-protected-resource/catalog/mcp, /catalog/.well-known/oauth-protected-resource
+              filters:
+                - SetPath=/.well-known/oauth-protected-resource
+                - PreserveHostHeader
+                - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
+
+            # RFC 9728 Discovery - Membership
+            - id: service-membership-mcp-discovery
+              uri: http://membership:8082
+              predicates:
+                - Path=/.well-known/oauth-protected-resource/membership/mcp, /membership/.well-known/oauth-protected-resource
+              filters:
+                - SetPath=/.well-known/oauth-protected-resource
+                - PreserveHostHeader
+                - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
+
+            # RFC 9728 Discovery - Fallback / Root
+            - id: service-root-mcp-discovery
+              uri: http://catalog:8081
+              predicates:
+                - Path=/.well-known/oauth-protected-resource
+              filters:
+                - PreserveHostHeader
+                - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
+
+            # VideoClub Catalog MCP Server
+            - id: service-catalog-mcp
+              uri: http://catalog:8081
+              predicates:
+                - Path=/catalog/mcp/**, /catalog/mcp
+              filters:
+                - RewritePath=/catalog/mcp(?<segment>/?.*), /mcp$\{segment}
+                - PreserveHostHeader
+                - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
+
+            # VideoClub Membership MCP Server
+            - id: service-membership-mcp
+              uri: http://membership:8082
+              predicates:
+                - Path=/membership/mcp/**, /membership/mcp
+              filters:
+                - RewritePath=/membership/mcp(?<segment>/?.*), /mcp$\{segment}
+                - PreserveHostHeader
+                - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
+
+            # Default / Legacy MCP fallback (:8081)
+            - id: service-default-mcp
+              uri: http://catalog:8081
+              predicates:
+                - Path=/mcp/**, /mcp
+              filters:
+                - PreserveHostHeader
+                - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE

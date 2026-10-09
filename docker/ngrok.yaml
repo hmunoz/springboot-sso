@@ -1,0 +1,32 @@
+name: videoclub
+
+services:
+  # ============================================================================
+  # Nginx Reverse Proxy: Unifica los 3 servicios bajo el unico dominio de ngrok
+  # - /realms/** -> video-keycloak:8080
+  # - /.well-known/oauth-protected-resource y /mcp -> videoclub-catalog-prod:8081
+  # - /membership/mcp -> videoclub-membership-prod:8082
+  # ============================================================================
+  ngrok-proxy:
+    image: nginx:alpine
+    container_name: videoclub-ngrok-proxy
+    restart: unless-stopped
+    volumes:
+      - ./ngrok/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - default
+
+  # ============================================================================
+  # ngrok Tunnel: Conecta el dominio estatico gratuito al proxy nginx
+  # ============================================================================
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: videoclub-ngrok
+    restart: unless-stopped
+    command: http ngrok-proxy:80 --url ${NGROK_URL:-https://emmanuel-hirsute-savvily.ngrok-free.dev}
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    depends_on:
+      - ngrok-proxy
+    networks:
+      - default
