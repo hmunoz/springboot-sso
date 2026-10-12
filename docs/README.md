@@ -83,6 +83,8 @@ Ninguno de los dos necesita estar registrado como client en Keycloak para **vali
   Modelo de dominio JPA, baja lógica (Soft Delete), procesamiento asíncrono con *Event-Carried State Transfer*, consumidor idempotente y Dead Letter Queue (`socio.events.dlq`).
 * **[Integración Keycloak, RabbitMQ y Anti-Corruption Layer (ACL)](keycloak-rabbitmq-integration.md)**:
   Compilación del plugin Keycloak RabbitMQ SPI, separación de exchanges técnicos (`keycloak.events`) vs. canónicos (`videoclub.events`) y normalización de payloads heterogéneos con Anti-Corruption Layer.
+* **[Idempotencia en Endpoints REST: Concepto y Aplicación al Carrito](idempotencia-http.md)**:
+  Reintentos tras un commit con respuesta perdida, header `Idempotency-Key`, reclamo atómico (`INSERT ... ON CONFLICT`), garantías *at-least-once* vs. *exactly-once* y su aplicación al checkout del carrito en `membership-service`. Basado en el artículo [One Annotation to Make Spring Boot REST Endpoints Idempotent](https://medium.com/heap-wire/one-annotation-to-make-spring-boot-rest-endpoints-idempotent-6345e72d1e3c).
 
 ---
 
